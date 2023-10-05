@@ -1,5 +1,7 @@
 #include <printf.h>
+#include <ranges>
 #include <type_traits>
+
 
 #include <boost/asio.hpp>
 
@@ -26,6 +28,15 @@ private:
 template <typename Executor>
 basic_dbus_socket(Executor e) -> basic_dbus_socket<Executor>;
 
+namespace env {
+static constexpr std::string_view session{ "DBUS_SESSION_BUS_ADDRESS" };
+static constexpr std::string_view system{ "DBUS_SYSTEM_BUS_ADDRESS" };
+}  // namespace env
+
+namespace detail {
+static constexpr std::string_view unix_path_prefix{ "unix:path=" };
+}
+
 }  // namespace boost::asio::dbus
 
 namespace asio = boost::asio;
@@ -35,6 +46,11 @@ int main() {
   asio::io_context ctx;
 
   asio::dbus::basic_dbus_socket socket{ ctx };
+
+  std::string path{ getenv(asio::dbus::env::session.data()) };
+  std::regex_replace(str,std::regex("the"), "a")
+  std::ranges::replace(path, "foo", "");
+
   asio::local::stream_protocol::endpoint ep{ "/run/dbus/system_bus_socket"sv };
   socket.async_connect(ep, [](auto&& ec) {
     if (ec) {
