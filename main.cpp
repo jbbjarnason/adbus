@@ -2,6 +2,7 @@
 #include <regex>
 #include <type_traits>
 
+#include <fmt/format.h>
 #include <boost/asio.hpp>
 
 namespace boost::asio::dbus {
@@ -17,6 +18,73 @@ public:
 
   auto async_connect(auto&& endpoint, auto&& token) {
     return socket_.async_connect(std::forward<decltype(endpoint)>(endpoint), std::forward<decltype(token)>(token));
+  }
+
+  auto ascii_to_hex(std::string_view str) -> std::string {
+    // todo compile time
+    std::string hex;
+    hex.reserve(str.size() * 2);
+    for (auto&& c : str) {
+      hex += fmt::format("{:02x}", c);
+    }
+    return hex;
+  }
+
+  /// \brief write and take ownership of the buffer
+  auto async_write_some(auto&& buffer, auto&& token)
+      -> asio::async_result<std::decay_t<decltype(token)>, void(std::error_code, std::size_t)>::return_type {
+    return asio::async_compose<decltype(token), void(std::error_code, std::size_t)>(
+        [this, first_call = true,
+         buffer_ptr = std::make_shared<std::remove_cvref_t<decltype(buffer)>>(std::forward<decltype(buffer)>(buffer))](
+            auto& self, std::error_code err = {}, std::size_t size = 0) mutable {
+          if (first_call) {
+            first_call = false;
+            socket_.async_write_some(asio::buffer(*buffer_ptr), std::move(self));
+            return;
+          }
+          self.complete(err, size);
+        },
+        token);
+  }
+
+  auto async_read_some(auto&& buffer, auto&& token) {
+    return asio::async_compose<decltype(token), void(std::error_code, std::shared_ptr<std::remove_cvref_t<decltype(buffer)>>)>(
+        [this, first_call = true,
+         buffer_ptr = std::make_shared<std::remove_cvref_t<decltype(buffer)>>(std::forward<decltype(buffer)>(buffer))](
+            auto& self, std::error_code err = {}, std::size_t size = 0) mutable {
+          if (first_call) {
+            first_call = false;
+            socket_.async_read_some(asio::buffer(*buffer_ptr), std::move(self));
+            return;
+          }
+          self.complete(err, std::move(buffer_ptr));
+        },
+        token);
+  }
+
+  auto external_authenticate(auto&& token) { return external_authenticate(getuid(), std::forward<decltype(token)>(token)); }
+
+  /// \note https://dbus.freedesktop.org/doc/dbus-specification.html#auth-protocol
+  template <typename completion_token_t>
+  auto external_authenticate(decltype(getuid()) user_id, completion_token_t&& token)
+      -> asio::async_result<std::decay_t<completion_token_t>, void(std::error_code, std::size_t)>::return_type {
+    //  31303030 is ASCII decimal "1000" represented in hex, so
+    //  the client is authenticating as Unix uid 1000 in this example.
+    //
+    //  C: AUTH EXTERNAL 31303030
+    //  S: OK 1234deadbeef
+    //  C: BEGIN
+
+    // The protocol is a line-based protocol, where each line ends with \r\n.
+    static constexpr std::string_view line_ending{ "\r\n" };
+    static constexpr std::string_view auth_command{ "AUTH" };
+    static constexpr std::string_view auth_mechanism{ "EXTERNAL" };
+
+    auto hex = ascii_to_hex(std::to_string(user_id));
+
+    auto auth = fmt::format("{} {} {}{}", auth_command, auth_mechanism, hex, line_ending);
+
+    return async_write_some(std::move(auth), std::forward<decltype(token)>(token));
   }
 
 private:
@@ -49,13 +117,18 @@ int main() {
   std::string path{ getenv(asio::dbus::env::session.data()) };
   path = std::regex_replace(path, std::regex(std::string{ asio::dbus::detail::unix_path_prefix }), "");
 
-  asio::local::stream_protocol::endpoint ep{ "/run/dbus/system_bus_socket"sv };
-  socket.async_connect(ep, [](auto&& ec) {
+  asio::local::stream_protocol::endpoint ep{ path };
+  socket.async_connect(ep, [&socket](auto&& ec) {
     if (ec) {
       printf("error: %s\n", ec.message().c_str());
       return;
     }
     printf("connected\n");
+    socket.external_authenticate([&socket](std::error_code err, std::size_t size) {
+      socket.async_read_some(std::string{}, [](std::error_code err, std::shared_ptr<std::string> buffer){
+        fmt::print("read buffer{} err {}\n", buffer->size(), err.message());
+      });
+    });
   });
 
   ctx.run();
