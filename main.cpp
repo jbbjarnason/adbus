@@ -1,7 +1,6 @@
 #include <printf.h>
-#include <ranges>
+#include <regex>
 #include <type_traits>
-
 
 #include <boost/asio.hpp>
 
@@ -48,8 +47,7 @@ int main() {
   asio::dbus::basic_dbus_socket socket{ ctx };
 
   std::string path{ getenv(asio::dbus::env::session.data()) };
-  std::regex_replace(str,std::regex("the"), "a")
-  std::ranges::replace(path, "foo", "");
+  path = std::regex_replace(path, std::regex(std::string{ asio::dbus::detail::unix_path_prefix }), "");
 
   asio::local::stream_protocol::endpoint ep{ "/run/dbus/system_bus_socket"sv };
   socket.async_connect(ep, [](auto&& ec) {
