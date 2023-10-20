@@ -66,18 +66,22 @@ public:
     //  C: AUTH EXTERNAL 31303030
     //  S: OK 1234deadbeef
     //  C: BEGIN
+    using std::string_view_literals::operator""sv;
 
     // The protocol is a line-based protocol, where each line ends with \r\n.
     static constexpr std::string_view line_ending{ "\r\n" };
     static constexpr std::string_view auth_command{ "AUTH" };
+    static constexpr std::string_view begin_command{ "BEGIN" };
+    static constexpr std::string_view ok_command{ "OK" };
     static constexpr std::string_view auth_mechanism{ "EXTERNAL" };
 
-    enum struct state_e : std::uint8_t { send_auth, recv_ack, complete };
+    enum struct state_e : std::uint8_t { send_auth, recv_ack, send_begin, complete };
     auto const user_id_hex{ ascii_to_hex(std::to_string(user_id)) };
     return asio::async_compose<completion_token_t, void(std::error_code, std::string_view)>(
         [this, state = state_e::send_auth,
          auth{ fmt::format("{} {} {}{}", auth_command, auth_mechanism, user_id_hex, line_ending) },
-         recv_buffer{ std::make_shared<std::array<char, 1024>>() }](auto& self, std::error_code err = {}, std::size_t size = 0) mutable -> void {
+         recv_buffer{ std::make_shared<std::array<char, 1024>>() }, recv_view{""sv}](auto& self, std::error_code err = {},
+                                                                    std::size_t size = 0) mutable -> void {
           if (err) {
             return self.complete(err, {});
           }
@@ -87,11 +91,20 @@ public:
               return socket_.async_write_some(asio::buffer(auth), std::move(self));
             }
             case state_e::recv_ack: {
-              state = state_e::complete;
+              state = state_e::send_begin;
               return socket_.async_read_some(asio::buffer(*recv_buffer), std::move(self));
             }
+            case state_e::send_begin: {
+              // The server replies with DATA, OK or REJECTED.
+              state = state_e::complete;
+              recv_view = { recv_buffer->data(), size };
+              if (recv_view.starts_with(ok_command) && recv_view.ends_with(line_ending)) {
+                return socket_.async_write_some(asio::buffer(begin_command), std::move(self));
+              }
+              return self.complete(std::make_error_code(std::errc::bad_message), recv_view);
+            }
             case state_e::complete: {
-              return self.complete(err, std::string_view{ recv_buffer->data(), size });
+              return self.complete(err, recv_view);
             }
           }
         },
@@ -138,9 +151,8 @@ int main() {
       return;
     }
     fmt::print("connected\n");
-    socket.external_authenticate([](std::error_code err, std::string_view msg) {
-      fmt::print("auth err {}: msg {}\n", err.message(), msg);
-    });
+    socket.external_authenticate(
+        [](std::error_code err, std::string_view msg) { fmt::print("auth err {}: msg {}\n", err.message(), msg); });
   });
 
   ctx.run();
