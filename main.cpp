@@ -16,7 +16,38 @@ public:
   explicit basic_dbus_socket(executor_in_t&& executor) : socket_{ std::forward<executor_in_t>(executor) } {}
 
   auto async_connect(auto&& endpoint, auto&& token) {
-    return socket_.async_connect(std::forward<decltype(endpoint)>(endpoint), std::forward<decltype(token)>(token));
+    // https://dbus.freedesktop.org/doc/dbus-specification.html#auth-nul-byte
+    enum struct state_e : std::uint8_t { connect, auth_nul_byte, rcv_ack, complete };
+    using std::string_literals::operator""s;
+    return asio::async_compose<decltype(token), void(std::error_code)>(
+        [this, state = state_e::connect, endp = std::forward<decltype(endpoint)>(endpoint), auth_buffer = "\0"s,
+         recv_buffer = std::array<char, 1024>{}](auto& self, std::error_code err = {}, std::size_t = 0) mutable -> void {
+          if (err) {
+            return self.complete(err);
+          }
+          switch (state) {
+            case state_e::connect: {
+              state = state_e::auth_nul_byte;
+              socket_.async_connect(endp, std::move(self));
+              return;
+            }
+            case state_e::auth_nul_byte: {
+              state = state_e::rcv_ack;
+              socket_.async_write_some(asio::buffer(auth_buffer), std::move(self));
+              return;
+            }
+            case state_e::rcv_ack: {
+              state = state_e::complete;
+              return self.complete(err);
+//              socket_.async_read_some(asio::buffer(recv_buffer), std::move(self));
+              return;
+            }
+            case state_e::complete: {
+              return self.complete(err);
+            }
+          }
+        },
+        token, socket_);
   }
 
   auto ascii_to_hex(std::string_view str) -> std::string {
@@ -97,46 +128,23 @@ public:
   template <typename completion_token_t>
   auto external_authenticate(decltype(getuid()) user_id, completion_token_t&& token)
       -> asio::async_result<std::decay_t<completion_token_t>, void(std::error_code, std::size_t)>::return_type {
-    enum struct state_e : std::uint8_t { begin, auth, done };
-    return asio::async_compose<completion_token_t, void(std::error_code, std::size_t)>(
-        [this, state = state_e::begin, user_id](auto& self, std::error_code err = {}, std::size_t size = 0) mutable {
-          //  31303030 is ASCII decimal "1000" represented in hex, so
-          //  the client is authenticating as Unix uid 1000 in this example.
-          //
-          //  C: AUTH EXTERNAL 31303030
-          //  S: OK 1234deadbeef
-          //  C: BEGIN
+    //  31303030 is ASCII decimal "1000" represented in hex, so
+    //  the client is authenticating as Unix uid 1000 in this example.
+    //
+    //  C: AUTH EXTERNAL 31303030
+    //  S: OK 1234deadbeef
+    //  C: BEGIN
 
-          // The protocol is a line-based protocol, where each line ends with \r\n.
-          static constexpr std::string_view line_ending{ "\r\n" };
-          static constexpr std::string_view auth_command{ "AUTH" };
-          static constexpr std::string_view auth_mechanism{ "EXTERNAL" };
+    // The protocol is a line-based protocol, where each line ends with \r\n.
+    static constexpr std::string_view line_ending{ "\r\n" };
+    static constexpr std::string_view auth_command{ "AUTH" };
+    static constexpr std::string_view auth_mechanism{ "EXTERNAL" };
 
-          if (err) {
-            self.complete(err, size);
-            return;
-          }
+    auto hex = ascii_to_hex(std::to_string(user_id));
 
-          switch (state) {
-            case state_e::begin: {
-              state = state_e::auth;
-              async_write_some(std::array{ '\0' }, std::move(self));
-              break;
-            }
-            case state_e::auth: {
-              state = state_e::done;
-              auto hex = ascii_to_hex(std::to_string(user_id));
-              auto auth = fmt::format("{} {} {}{}", auth_command, auth_mechanism, hex, line_ending);
-              async_write_some(std::move(auth), std::move(self));
-              break;
-            }
-            case state_e::done: {
-              self.complete(err, size);
-              return;
-            }
-          }
-        },
-        token, socket_);
+    auto auth = fmt::format("{} {} {}{}", auth_command, auth_mechanism, hex, line_ending);
+
+    return async_write_some(std::move(auth), std::forward<decltype(token)>(token));
   }
 
 private:
@@ -180,6 +188,9 @@ int main() {
     }
     fmt::print("connected\n");
     socket.external_authenticate([&socket](std::error_code err, std::size_t size) {
+      fmt::print("auth err {} size {}\n", err.message(), size);
+
+
       socket.async_receive(std::string{}, [](std::error_code err, std::shared_ptr<std::string> buffer) {
         fmt::print("read buffer{} err {}\n", buffer->size(), err.message());
       });
