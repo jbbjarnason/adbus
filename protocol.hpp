@@ -4,6 +4,7 @@
 #include <expected>
 #include <string>
 #include <string_view>
+#include <variant>
 
 namespace adbus::concepts {
 
@@ -23,12 +24,46 @@ concept explicit_signed_integral = requires {
 
 }  // namespace adbus::concepts
 
+namespace adbus::details {
+
+template <typename char_t = char, std::size_t N>
+[[nodiscard]] consteval std::array<char_t, N + 1> make_static_buffer(std::string const& in) {
+  std::array<char_t, N + 1> buffer{};
+  std::move(in.begin(), in.end(), buffer.begin());
+  return buffer;
+}
+
+template <typename char_t = char>
+[[nodiscard]] consteval auto join_string_view_to(std::output_iterator<char_t> auto out, std::basic_string_view<char_t> view)
+    -> decltype(out) {
+  return std::copy(view.begin(), view.end(), out);
+}
+
+template <typename char_t = char, typename... view_t>
+  requires(std::same_as<std::string_view, std::remove_cvref_t<view_t>> && ...)
+[[nodiscard]] consteval std::basic_string_view<char_t> join_string_views(view_t ... views) {
+  std::basic_string<char_t> buffer{};
+  auto out = std::back_inserter(buffer);
+  (..., (out = join_string_view_to(out, views)));
+  static constexpr auto size{ buffer.size() };
+  static constexpr auto array_buffer{ make_static_buffer<char_t, size>(buffer) };
+  return std::basic_string_view<char_t>{ array_buffer.begin(), array_buffer.end() };
+}
+
+using std::string_view_literals::operator""sv;
+static_assert(join_string_views("foo"sv, "bar"sv) == "foobar"sv);
+
+}  // namespace adbus::details
+
 namespace adbus::protocol::type {
 
 using std::string_view_literals::operator""sv;
 
 template <typename type_t>
 struct signature : std::false_type {};
+
+template <typename type_t>
+static constexpr auto signature_v{ signature<type_t>::value };
 
 template <>
 struct signature<std::uint8_t> {
@@ -104,7 +139,7 @@ struct path {
     using index_t = std::size_t;
 
     constexpr bool operator()() const noexcept { return code != code_e::no_error; }
-    constexpr bool operator==(error const& ) const noexcept = default;
+    constexpr bool operator==(error const&) const noexcept = default;
 
     code_e code{ code_e::no_error };
     index_t index{ 0 };
@@ -186,18 +221,34 @@ static_assert((not has_signature<char*>));
 static_assert((not has_signature<const char*>));
 static_assert((not has_signature<std::int8_t>));
 
-static_assert(signature<std::uint8_t>::value == "y"sv);
-static_assert(signature<bool>::value == "b"sv);
-static_assert(signature<std::int16_t>::value == "n"sv);
-static_assert(signature<std::uint16_t>::value == "q"sv);
-static_assert(signature<std::int32_t>::value == "i"sv);
-static_assert(signature<std::uint32_t>::value == "u"sv);
-static_assert(signature<std::int64_t>::value == "x"sv);
-static_assert(signature<std::uint64_t>::value == "t"sv);
-static_assert(signature<double>::value == "d"sv);
-static_assert(signature<std::string_view>::value == "s"sv);
-static_assert(signature<std::string>::value == "s"sv);
-static_assert(signature<path>::value == "o"sv);
+static_assert(signature_v<std::uint8_t> == "y"sv);
+static_assert(signature_v<bool> == "b"sv);
+static_assert(signature_v<std::int16_t> == "n"sv);
+static_assert(signature_v<std::uint16_t> == "q"sv);
+static_assert(signature_v<std::int32_t> == "i"sv);
+static_assert(signature_v<std::uint32_t> == "u"sv);
+static_assert(signature_v<std::int64_t> == "x"sv);
+static_assert(signature_v<std::uint64_t> == "t"sv);
+static_assert(signature_v<double> == "d"sv);
+static_assert(signature_v<std::string_view> == "s"sv);
+static_assert(signature_v<std::string> == "s"sv);
+static_assert(signature_v<path> == "o"sv);
+
+template <has_signature type_t, has_signature... types_t>
+struct signature<std::variant<type_t, types_t...>> {
+  static constexpr auto value{ "v"sv };
+};
+
+static_assert(signature<std::variant<std::uint8_t>>::value == "v"sv);
+static_assert(signature<std::variant<std::uint8_t, std::string>>::value == "v"sv);
+static_assert(has_signature<std::variant<std::uint8_t, std::string>>);
+static_assert(!has_signature<std::variant<std::int8_t>>);
+
+template <std::ranges::range type_t>
+  requires has_signature<std::ranges::range_value_t<type_t>>
+struct signature<type_t> {
+  static constexpr auto value{ "a"sv };
+};
 
 template <has_signature... types_t>
 std::string_view constexpr composed_signature(types_t&&... types) {
