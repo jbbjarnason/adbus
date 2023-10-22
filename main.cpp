@@ -4,6 +4,8 @@
 #include <fmt/format.h>
 #include <boost/asio.hpp>
 
+#include "protocol.hpp"
+
 namespace boost::asio::dbus {
 
 template <typename Executor = any_io_executor>
@@ -152,10 +154,14 @@ int main() {
     }
     fmt::print("connected\n");
     socket.external_authenticate(
-        [](std::error_code err, std::string_view msg) { fmt::print("auth err {}: msg {}\n", err.message(), msg); });
+        [](std::error_code err, std::string_view msg) {
+          // todo why does this not work in debug mode not running in debugger?
+          fmt::print("auth err {}: msg {}\n", err.message(), msg);
+        });
   });
 
   ctx.run();
 
+  fmt::print("done\n");
   return 0;
 }
