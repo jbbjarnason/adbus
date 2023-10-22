@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cstdint>
-#include <filesystem>
+#include <expected>
 #include <string>
 #include <string_view>
 
@@ -84,8 +84,81 @@ struct signature<type_t> {
   static constexpr auto value{ "s"sv };
 };
 
+// * The path may be of any length.
+// * The path must begin with an ASCII '/' (integer 47) character, and must consist of elements separated by slash
+// characters.
+// * Each element must only contain the ASCII characters "[A-Z][a-z][0-9]_"
+// * No element may be the empty string.
+// * Multiple '/' characters cannot occur in sequence.
+// * A trailing '/' character is not allowed unless the path is the root path (a single '/' character).
+struct path {
+  struct error {
+    enum struct code_e : std::uint8_t {
+      no_error = 0,
+      empty,
+      not_absolute,  // does not start with slash
+      trailing_slash,
+      invalid_character,
+      multiple_slashes,
+    };
+    using index_t = std::size_t;
+
+    constexpr bool operator()() const noexcept { return code != code_e::no_error; }
+    constexpr bool operator==(error const& ) const noexcept = default;
+
+    code_e code{ code_e::no_error };
+    index_t index{ 0 };
+  };
+
+  static constexpr error validate(std::string_view input) {
+    using enum error::code_e;
+    if (input.empty()) {
+      return error{ .code = empty, .index = 0 };
+    }
+    if (input.front() != '/') {
+      return error{ .code = not_absolute, .index = 0 };
+    }
+    if (input.size() == 1) {
+      return error{};
+    }
+    if (input.back() == '/') {
+      return error{ .code = trailing_slash, .index = input.size() - 1 };
+    }
+    for (auto it = input.begin() + 1; it != input.end(); ++it) {
+      if (*it == '/' && *(it - 1) == '/') {
+        return error{ .code = multiple_slashes, .index = static_cast<error::index_t>(std::distance(input.begin(), it)) };
+      }
+      // We have already checked the first character so this should be safe.
+      if (!((*it >= 'A' && *it <= 'Z') || (*it >= 'a' && *it <= 'z') || (*it >= '0' && *it <= '9') || *it == '_' ||
+            *it == '/')) {
+        return error{ .code = invalid_character, .index = static_cast<error::index_t>(std::distance(input.begin(), it)) };
+      }
+    }
+    return error{};
+  }
+
+  static constexpr std::expected<path, error> make(std::string_view input) {
+    auto err = validate(input);
+    if (err()) {
+      return std::unexpected{ err };
+    }
+    return path{ .buffer = std::string{ input } };
+  }
+  std::string buffer{};
+};
+
+static_assert(path::validate("/foo/bar") == path::error{});
+static_assert(path::validate("/") == path::error{});
+static_assert(path::validate("/a") == path::error{});
+static_assert(path::validate("") == path::error{ .code = path::error::code_e::empty, .index = 0 });
+static_assert(path::validate("//") == path::error{ .code = path::error::code_e::trailing_slash, .index = 1 });
+static_assert(path::validate("///") == path::error{ .code = path::error::code_e::trailing_slash, .index = 2 });
+static_assert(path::validate("/ab/") == path::error{ .code = path::error::code_e::trailing_slash, .index = 3 });
+static_assert(path::validate("///a") == path::error{ .code = path::error::code_e::multiple_slashes, .index = 1 });
+static_assert(path::validate("/a.b") == path::error{ .code = path::error::code_e::invalid_character, .index = 2 });
+
 template <typename type_t>
-  requires std::same_as<std::remove_cvref_t<type_t>, std::filesystem::path>
+  requires std::same_as<std::remove_cvref_t<type_t>, path>
 struct signature<type_t> {
   static constexpr auto value{ "o"sv };
 };
@@ -107,7 +180,7 @@ static_assert(has_signature<std::uint64_t>);
 static_assert(has_signature<double>);
 static_assert(has_signature<std::string_view>);
 static_assert(has_signature<std::string>);
-static_assert(has_signature<std::filesystem::path>);
+static_assert(has_signature<path>);
 
 static_assert((not has_signature<char*>));
 static_assert((not has_signature<const char*>));
@@ -124,11 +197,11 @@ static_assert(signature<std::uint64_t>::value == "t"sv);
 static_assert(signature<double>::value == "d"sv);
 static_assert(signature<std::string_view>::value == "s"sv);
 static_assert(signature<std::string>::value == "s"sv);
-static_assert(signature<std::filesystem::path>::value == "o"sv);
+static_assert(signature<path>::value == "o"sv);
 
 template <has_signature... types_t>
 std::string_view constexpr composed_signature(types_t&&... types) {
-  return {}; // todo implement
+  return {};  // todo implement
 }
 
 }  // namespace adbus::protocol::type
