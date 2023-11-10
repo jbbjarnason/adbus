@@ -6,6 +6,14 @@
 #include <string_view>
 #include <variant>
 
+// for testing
+#include <array>
+#include <concepts.hpp>
+#include <set>
+#include <tuple>
+#include <tuplet/tuplet.hpp>
+#include <vector>
+
 namespace adbus::concepts {
 
 template <typename presumed_integer_t, typename integer_t>
@@ -26,32 +34,30 @@ concept explicit_signed_integral = requires {
 
 namespace adbus::details {
 
-template <typename char_t = char, std::size_t N>
-[[nodiscard]] consteval std::array<char_t, N + 1> make_static_buffer(std::string const& in) {
-  std::array<char_t, N + 1> buffer{};
-  std::move(in.begin(), in.end(), buffer.begin());
-  return buffer;
-}
+template <std::array V>
+struct make_static {
+  static constexpr auto value = V;
+};
 
-template <typename char_t = char>
-[[nodiscard]] consteval auto join_string_view_to(std::output_iterator<char_t> auto out, std::basic_string_view<char_t> view)
-    -> decltype(out) {
-  return std::copy(view.begin(), view.end(), out);
+template <const std::string_view&... Strs>
+constexpr std::string_view join() {
+  constexpr auto joined_arr = []() {
+    constexpr size_t len = (Strs.size() + ... + 0);
+    std::array<char, len + 1> arr{};
+    auto append = [i = 0, &arr](const auto& s) mutable {
+      for (auto c : s)
+        arr[i++] = c;
+    };
+    (append(Strs), ...);
+    arr[len] = 0;
+    return arr;
+  }();
+  auto& static_arr = make_static<joined_arr>::value;
+  return { static_arr.data(), static_arr.size() - 1 };
 }
-
-template <typename char_t = char, typename... view_t>
-  requires(std::same_as<std::string_view, std::remove_cvref_t<view_t>> && ...)
-[[nodiscard]] consteval std::basic_string_view<char_t> join_string_views(view_t ... views) {
-  std::basic_string<char_t> buffer{};
-  auto out = std::back_inserter(buffer);
-  (..., (out = join_string_view_to(out, views)));
-  static constexpr auto size{ buffer.size() };
-  static constexpr auto array_buffer{ make_static_buffer<char_t, size>(buffer) };
-  return std::basic_string_view<char_t>{ array_buffer.begin(), array_buffer.end() };
-}
-
-using std::string_view_literals::operator""sv;
-static_assert(join_string_views("foo"sv, "bar"sv) == "foobar"sv);
+// Helper to get the value out
+template <const std::string_view&... Strs>
+constexpr auto join_v = join<Strs...>();
 
 }  // namespace adbus::details
 
@@ -217,9 +223,9 @@ static_assert(has_signature<std::string_view>);
 static_assert(has_signature<std::string>);
 static_assert(has_signature<path>);
 
-static_assert((not has_signature<char*>));
-static_assert((not has_signature<const char*>));
-static_assert((not has_signature<std::int8_t>));
+static_assert(not has_signature<char*>);
+static_assert(not has_signature<const char*>);
+static_assert(not has_signature<std::int8_t>);
 
 static_assert(signature_v<std::uint8_t> == "y"sv);
 static_assert(signature_v<bool> == "b"sv);
@@ -239,16 +245,42 @@ struct signature<std::variant<type_t, types_t...>> {
   static constexpr auto value{ "v"sv };
 };
 
-static_assert(signature<std::variant<std::uint8_t>>::value == "v"sv);
-static_assert(signature<std::variant<std::uint8_t, std::string>>::value == "v"sv);
+static_assert(signature_v<std::variant<std::uint8_t>> == "v"sv);
+static_assert(signature_v<std::variant<std::uint8_t, std::string>> == "v"sv);
 static_assert(has_signature<std::variant<std::uint8_t, std::string>>);
 static_assert(!has_signature<std::variant<std::int8_t>>);
 
 template <std::ranges::range type_t>
   requires has_signature<std::ranges::range_value_t<type_t>>
 struct signature<type_t> {
-  static constexpr auto value{ "a"sv };
+  static constexpr auto prefix{ "a"sv };
+  static constexpr auto value{ details::join_v<prefix, signature_v<std::ranges::range_value_t<type_t>>> };
 };
+
+static_assert(signature_v<std::vector<int>> == "ai"sv);
+static_assert(signature_v<std::array<int, 10>> == "ai"sv);
+static_assert(signature_v<std::set<int>> == "ai"sv);
+
+template <typename tuple_t>
+  requires concepts::is_specialization_v<tuple_t, std::tuple>
+struct signature<tuple_t> {
+  static constexpr auto prefix{ "("sv };
+  static constexpr auto postfix{ ")"sv };
+  template <typename type_t>
+  struct join_impl;
+  template <typename... types_t>
+  struct join_impl<std::tuple<types_t...>> {
+    static constexpr auto value{ details::join_v<prefix, signature_v<types_t>..., postfix> };
+  };
+  static constexpr auto value{ join_impl<tuple_t>::value };
+};
+
+static_assert(signature_v<std::tuple<int, std::string>> == "(is)"sv);
+static_assert(signature_v<std::tuple<int, std::string, std::uint8_t>> == "(isy)"sv);
+static_assert(signature_v<std::tuple<int, std::array<std::uint8_t, 10>>> == "(iay)"sv);
+static_assert(signature_v<std::tuple<int, std::tuple<std::uint8_t, std::string>>> == "(i(ys))"sv);
+static_assert(signature_v<std::tuple<int, std::tuple<std::uint8_t, std::tuple<std::string, std::uint8_t>>>> ==
+              "(i(y(sy)))"sv);
 
 template <has_signature... types_t>
 std::string_view constexpr composed_signature(types_t&&... types) {
