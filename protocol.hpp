@@ -250,6 +250,8 @@ struct signature<dict_t> {
 static_assert(signature_v<std::map<int, std::string>> == "a{is}"sv);
 static_assert(signature_v<std::unordered_map<int, std::string>> == "a{is}"sv);
 static_assert(signature_v<std::map<std::string, std::tuple<int, std::string>>> == "a{s(is)}"sv);
+// nested dicts
+static_assert(signature_v<std::map<std::string, std::map<std::string, std::string>>> == "a{sa{ss}}"sv);
 
 template <has_signature... types_t>
 std::string_view constexpr composed_signature(types_t&&... types) {
