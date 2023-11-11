@@ -6,6 +6,8 @@
 #include <string_view>
 #include <variant>
 
+#include "string_view_join.hpp"
+
 // for testing
 #include <array>
 #include <concepts.hpp>
@@ -13,36 +15,6 @@
 #include <tuple>
 #include <tuplet/tuplet.hpp>
 #include <vector>
-
-
-namespace adbus::details {
-
-template <std::array V>
-struct make_static {
-  static constexpr auto value = V;
-};
-
-template <const std::string_view&... Strs>
-constexpr std::string_view join() {
-  constexpr auto joined_arr = []() {
-    constexpr size_t len = (Strs.size() + ... + 0);
-    std::array<char, len + 1> arr{};
-    auto append = [i = 0, &arr](const auto& s) mutable {
-      for (auto c : s)
-        arr[i++] = c;
-    };
-    (append(Strs), ...);
-    arr[len] = 0;
-    return arr;
-  }();
-  auto& static_arr = make_static<joined_arr>::value;
-  return { static_arr.data(), static_arr.size() - 1 };
-}
-// Helper to get the value out
-template <const std::string_view&... Strs>
-constexpr auto join_v = join<Strs...>();
-
-}  // namespace adbus::details
 
 namespace adbus::protocol::type {
 
@@ -64,32 +36,32 @@ struct signature<value_t> {
   static constexpr auto value{ "b"sv };
 };
 
-template <concepts::explicit_signed_integral<std::int16_t> value_t>
+template <concepts::explicit_integral<std::int16_t> value_t>
 struct signature<value_t> {
   static constexpr auto value{ "n"sv };
 };
 
-template <concepts::explicit_unsigned_integral<std::uint16_t> value_t>
+template <concepts::explicit_integral<std::uint16_t> value_t>
 struct signature<value_t> {
   static constexpr auto value{ "q"sv };
 };
 
-template <concepts::explicit_signed_integral<std::int32_t> value_t>
+template <concepts::explicit_integral<std::int32_t> value_t>
 struct signature<value_t> {
   static constexpr auto value{ "i"sv };
 };
 
-template <concepts::explicit_unsigned_integral<std::uint32_t> value_t>
+template <concepts::explicit_integral<std::uint32_t> value_t>
 struct signature<value_t> {
   static constexpr auto value{ "u"sv };
 };
 
-template <concepts::explicit_signed_integral<std::int64_t> value_t>
+template <concepts::explicit_integral<std::int64_t> value_t>
 struct signature<value_t> {
   static constexpr auto value{ "x"sv };
 };
 
-template <concepts::explicit_unsigned_integral<std::uint64_t> value_t>
+template <concepts::explicit_integral<std::uint64_t> value_t>
 struct signature<value_t> {
   static constexpr auto value{ "t"sv };
 };
