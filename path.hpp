@@ -5,7 +5,7 @@
 #include <string>
 #include <string_view>
 
-namespace adbus {
+namespace adbus::protocol {
 
 // * The path may be of any length.
 // * The path must begin with an ASCII '/' (integer 47) character, and must consist of elements separated by slash
@@ -26,7 +26,7 @@ struct path {
     };
     using index_t = std::size_t;
 
-    constexpr bool operator()() const noexcept { return code != code_e::no_error; }
+    constexpr explicit operator bool() const noexcept { return code != code_e::no_error; }
     constexpr bool operator==(error const&) const noexcept = default;
 
     code_e code{ code_e::no_error };
@@ -62,7 +62,7 @@ struct path {
 
   static constexpr std::expected<path, error> make(std::string_view input) {
     auto err = validate(input);
-    if (err()) {
+    if (err) {
       return std::unexpected{ err };
     }
     return path{ .buffer = std::string{ input } };
