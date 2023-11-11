@@ -5,6 +5,7 @@
 #include <boost/asio.hpp>
 
 #include "signature.hpp"
+#include "message_header.hpp"
 
 namespace boost::asio::dbus {
 
