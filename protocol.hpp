@@ -14,23 +14,6 @@
 #include <tuplet/tuplet.hpp>
 #include <vector>
 
-namespace adbus::concepts {
-
-template <typename presumed_integer_t, typename integer_t>
-concept explicit_unsigned_integral = requires {
-  requires not std::same_as<std::remove_cv_t<integer_t>, bool>;
-  requires std::unsigned_integral<integer_t>;
-  requires std::same_as<presumed_integer_t, integer_t>;
-};
-
-template <typename presumed_integer_t, typename integer_t>
-concept explicit_signed_integral = requires {
-  requires not std::same_as<std::remove_cv_t<integer_t>, bool>;
-  requires std::signed_integral<integer_t>;
-  requires std::same_as<presumed_integer_t, integer_t>;
-};
-
-}  // namespace adbus::concepts
 
 namespace adbus::details {
 
