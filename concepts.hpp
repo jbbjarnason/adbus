@@ -28,16 +28,42 @@ concept explicit_integral = requires {
 };
 
 template <class T>
-concept str_t = !
-                std::same_as<std::nullptr_t, T>&& std::convertible_to<std::decay_t<T>, std::string_view>;
+concept str_t = !std::same_as<std::nullptr_t, T> && std::convertible_to<std::decay_t<T>, std::string_view>;
 
 template <class T>
 concept has_push_back = requires(T t, typename T::value_type v) { t.push_back(v); };
 
 // this concept requires that T is string and copies the string in json
 template <class T>
-concept string_t = str_t<T> && !
-                               std::same_as<std::decay_t<T>, std::string_view>&& has_push_back<T>;
+concept string_t = str_t<T> && !std::same_as<std::decay_t<T>, std::string_view> && has_push_back<T>;
+
+// this concept requires that T is just a view
+template <class T>
+concept str_view_t = std::same_as<std::decay_t<T>, std::string_view>;
+
+template <class T>
+concept resizeable = requires(T container) { container.resize(0); };
+
+template <class T>
+concept erasable = requires(T container) { container.erase(container.cbegin(), container.cend()); };
+
+template <class T>
+concept has_size = requires(T container) { container.size(); };
+
+template <class T>
+concept has_empty = requires(T container) {
+  { container.empty() } -> std::convertible_to<bool>;
+};
+
+template <class T>
+concept has_data = requires(T container) { container.data(); };
+
+// from https://stackoverflow.com/questions/16337610/how-to-know-if-a-type-is-a-specialization-of-stdvector
+template <class, template <class...> class>
+constexpr bool is_specialization_v = false;
+
+template <template <class...> class T, class... Args>
+constexpr bool is_specialization_v<T<Args...>, T> = true;
 
 namespace type {
 // The fixed types are basic types whose values have a fixed length,
@@ -45,9 +71,7 @@ namespace type {
 template <typename type_t>
 concept fixed = [] {
   using t = std::remove_cvref_t<type_t>;
-  return requires {
-    requires (num_t<t> || std::same_as<t, bool>) && !std::same_as<std::int8_t, t>;
-  };
+  return requires { requires num_t<t> && !std::same_as<std::int8_t, t> || std::same_as<t, bool>; };
 }();
 static_assert(!fixed<std::int8_t>);  // int8_t is not supported by the specification
 static_assert(fixed<std::uint8_t>);
@@ -60,15 +84,23 @@ static_assert(fixed<std::int64_t>);
 static_assert(fixed<std::uint64_t>);
 static_assert(fixed<double>);
 
+template <typename type_t>
+concept string_like = str_t<type_t>;
+
+template <typename type_t>
+concept basic = fixed<type_t> || string_like<type_t>;
+
+// ARRAY, STRUCT, DICT_ENTRY, VARIANT
+// Todo make this more generalized
+template <typename type_t>
+concept container = [] {
+  using t = std::remove_cvref_t<type_t>;
+  return requires {
+    requires is_specialization_v<t, std::vector> || is_specialization_v<t, std::map> || is_specialization_v<t, std::unordered_map> ||
+                 is_specialization_v<t, std::tuple> || is_specialization_v<t, std::variant>;
+  };
+}();
 
 }  // namespace type
-
-// from
-// https://stackoverflow.com/questions/16337610/how-to-know-if-a-type-is-a-specialization-of-stdvector
-template <class, template <class...> class>
-constexpr bool is_specialization_v = false;
-
-template <template <class...> class T, class... Args>
-constexpr bool is_specialization_v<T<Args...>, T> = true;
 
 }  // namespace adbus::concepts

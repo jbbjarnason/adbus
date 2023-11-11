@@ -237,6 +237,20 @@ static_assert(signature_v<std::tuple<int, std::tuple<std::uint8_t, std::string>>
 static_assert(signature_v<std::tuple<int, std::tuple<std::uint8_t, std::tuple<std::string, std::uint8_t>>>> ==
               "(i(y(sy)))"sv);
 
+template <typename dict_t>
+  requires(concepts::is_specialization_v<dict_t, std::map> || concepts::is_specialization_v<dict_t, std::unordered_map>) &&
+          concepts::type::basic<typename dict_t::key_type>
+struct signature<dict_t> {
+  static constexpr auto prefix{ "a{"sv };
+  static constexpr auto postfix{ "}"sv };
+  static constexpr auto value{
+    details::join_v<prefix, signature_v<typename dict_t::key_type>, signature_v<typename dict_t::mapped_type>, postfix>
+  };
+};
+static_assert(signature_v<std::map<int, std::string>> == "a{is}"sv);
+static_assert(signature_v<std::unordered_map<int, std::string>> == "a{is}"sv);
+static_assert(signature_v<std::map<std::string, std::tuple<int, std::string>>> == "a{s(is)}"sv);
+
 template <has_signature... types_t>
 std::string_view constexpr composed_signature(types_t&&... types) {
   return {};  // todo implement
