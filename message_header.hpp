@@ -149,5 +149,8 @@ struct header {
 template <>
 struct adbus::protocol::meta<adbus::protocol::header> {
   using type = adbus::protocol::header;
-  static constexpr auto name{ "header" };
+  static constexpr std::string_view name{ "header" };
+  static constexpr auto value{
+    pack(&type::endian, &type::type, &type::flags, &type::version, &type::body_length, &type::serial, &type::fields)
+  };
 };

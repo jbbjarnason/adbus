@@ -3,7 +3,16 @@
 #include <concepts>
 #include <string_view>
 
+#include "tuplet/tuplet.hpp"
+
 namespace adbus::protocol {
+
+namespace detail {
+template <typename type_t>
+struct pack_t {
+  type_t value;
+};
+}  // namespace detail
 
 template <typename value_t>
 struct meta;
@@ -15,8 +24,12 @@ concept meta_t = requires {
   requires meta<value_t>::value;
 };
 
-//template <typename ... member_t>
-//static constexpr auto object()
-
-
+constexpr auto pack(auto&&... args) {
+  if constexpr (sizeof...(args) == 0) {
+    return detail::pack_t{ tuplet::tuple{} };
+  } else {
+    return detail::pack_t{ tuplet::tuple{ std::forward<decltype(args)>(args)... } };
+  }
 }
+
+}  // namespace adbus::protocol

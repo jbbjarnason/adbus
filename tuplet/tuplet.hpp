@@ -72,10 +72,10 @@
 #define TUPLET_WEAK_REQUIRES(...) requires __VA_ARGS__
 #define _TUPLET_TYPES_EQ_WITH(T, U)                                            \
     bool                                                                       \
-        requires(::tuplet::equality_comparable_with<T, U> && ...)
+        requires(::adbus::tuplet::equality_comparable_with<T, U> && ...)
 #define _TUPLET_TYPES_CMP_WITH(T, U)                                           \
     bool                                                                       \
-        requires(::tuplet::equality_comparable_with<T, U> && ...)
+        requires(::adbus::tuplet::equality_comparable_with<T, U> && ...)
 #else
 #define TUPLET_OTHER_THAN(Self, Other)                                         \
     class Other, class = ::tuplet::sfinae::other_than<Self, Other>
@@ -126,6 +126,7 @@
 #endif
 #endif
 
+namespace adbus {
 
 ////////////////////////////////////////
 ////  tuplet::type_list Definition  ////
@@ -298,7 +299,7 @@ namespace tuplet {
     /// Takes a type B, and gives it the same "rvalue" status as Tup
     /// Used for forwarding values out of a tuple
     template <class Tup, class B>
-    using forward_as_t = typename ::tuplet::detail::_forward_as<Tup, B>::type;
+    using forward_as_t = typename ::adbus::tuplet::detail::_forward_as<Tup, B>::type;
 
     template <class First, class...>
     using first_t = First;
@@ -404,7 +405,7 @@ namespace tuplet::detail {
         T const& a,
         U const& b,
         bool& less) {
-        if constexpr (::tuplet::sfinae::detail::_test_m_compare<T, U>(0)) {
+        if constexpr (::adbus::tuplet::sfinae::detail::_test_m_compare<T, U>(0)) {
             int cmp = a.compare(b);
 
             if (cmp < 0) {
@@ -1460,7 +1461,7 @@ namespace tuplet::literals {
 } // namespace tuplet::literals
 
 
-
+} // namespace adbus
 
 
 //////////////////////////////////////////////////////////////////
@@ -1469,19 +1470,19 @@ namespace tuplet::literals {
 
 namespace std {
     template <class... T>
-    struct tuple_size<tuplet::tuple<T...>>
+    struct tuple_size<adbus::tuplet::tuple<T...>>
       : std::integral_constant<size_t, sizeof...(T)> {};
 
     template <size_t I, class... T>
-    struct tuple_element<I, tuplet::tuple<T...>> {
-        using type = decltype(tuplet::tuple<T...>::decl_elem(tuplet::tag<I>()));
+    struct tuple_element<I, adbus::tuplet::tuple<T...>> {
+        using type = decltype(adbus::tuplet::tuple<T...>::decl_elem(adbus::tuplet::tag<I>()));
     };
     template <class A, class B>
-    struct tuple_size<tuplet::pair<A, B>>
+    struct tuple_size<adbus::tuplet::pair<A, B>>
       : std::integral_constant<size_t, 2> {};
 
     template <size_t I, class A, class B>
-    struct tuple_element<I, tuplet::pair<A, B>> {
+    struct tuple_element<I, adbus::tuplet::pair<A, B>> {
         static_assert(I < 2, "tuplet::pair only has 2 elements");
         using type = std::conditional_t<I == 0, A, B>;
     };
