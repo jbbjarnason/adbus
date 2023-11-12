@@ -5,6 +5,8 @@
 #include <string>
 #include <string_view>
 
+#include "context.hpp"
+
 namespace adbus::protocol {
 
 // * The path may be of any length.
@@ -15,31 +17,13 @@ namespace adbus::protocol {
 // * Multiple '/' characters cannot occur in sequence.
 // * A trailing '/' character is not allowed unless the path is the root path (a single '/' character).
 struct path {
-  struct error {
-    enum struct code_e : std::uint8_t {
-      no_error = 0,
-      empty,
-      not_absolute,  // does not start with slash
-      trailing_slash,
-      invalid_character,
-      multiple_slashes,
-    };
-    using index_t = std::size_t;
-
-    constexpr explicit operator bool() const noexcept { return code != code_e::no_error; }
-    constexpr bool operator==(error const&) const noexcept = default;
-
-    code_e code{ code_e::no_error };
-    index_t index{ 0 };
-  };
-
   static constexpr error validate(std::string_view input) {
-    using enum error::code_e;
+    using enum error_code;
     if (input.empty()) {
       return error{ .code = empty, .index = 0 };
     }
     if (input.front() != '/') {
-      return error{ .code = not_absolute, .index = 0 };
+      return error{ .code = path_not_absolute, .index = 0 };
     }
     if (input.size() == 1) {
       return error{};
@@ -57,6 +41,7 @@ struct path {
         return error{ .code = invalid_character, .index = static_cast<error::index_t>(std::distance(input.begin(), it)) };
       }
     }
+    // todo length check?
     return error{};
   }
 
@@ -72,15 +57,16 @@ struct path {
 
 namespace test {
 
-static_assert(path::validate("/foo/bar") == path::error{});
-static_assert(path::validate("/") == path::error{});
-static_assert(path::validate("/a") == path::error{});
-static_assert(path::validate("") == path::error{ .code = path::error::code_e::empty, .index = 0 });
-static_assert(path::validate("//") == path::error{ .code = path::error::code_e::trailing_slash, .index = 1 });
-static_assert(path::validate("///") == path::error{ .code = path::error::code_e::trailing_slash, .index = 2 });
-static_assert(path::validate("/ab/") == path::error{ .code = path::error::code_e::trailing_slash, .index = 3 });
-static_assert(path::validate("///a") == path::error{ .code = path::error::code_e::multiple_slashes, .index = 1 });
-static_assert(path::validate("/a.b") == path::error{ .code = path::error::code_e::invalid_character, .index = 2 });
+static_assert(path::validate("/foo/bar") == error{});
+static_assert(path::validate("/") == error{});
+static_assert(path::validate("/a") == error{});
+static_assert(path::validate("") == error{ .code = error_code::empty, .index = 0 });
+static_assert(path::validate("//") == error{ .code = error_code::trailing_slash, .index = 1 });
+static_assert(path::validate("///") == error{ .code = error_code::trailing_slash, .index = 2 });
+static_assert(path::validate("/ab/") == error{ .code = error_code::trailing_slash, .index = 3 });
+static_assert(path::validate("///a") == error{ .code = error_code::multiple_slashes, .index = 1 });
+static_assert(path::validate("/a.b") == error{ .code = error_code::invalid_character, .index = 2 });
+static_assert(path::validate("a/b") == error{ .code = error_code::path_not_absolute, .index = 0 });
 
 }  // namespace test
 }  // namespace adbus
