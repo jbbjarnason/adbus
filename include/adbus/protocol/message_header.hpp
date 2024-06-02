@@ -1,25 +1,30 @@
 #pragma once
 
+#include <bitset>
 #include <bit>
+#include <variant>
+#include <vector>
 
-#include "meta.hpp"
-#include "name.hpp"
-#include "path.hpp"
+#include <adbus/protocol/meta.hpp>
+#include <adbus/protocol/name.hpp>
+#include <adbus/protocol/path.hpp>
 
-namespace adbus::protocol {
+namespace adbus::protocol::header {
 
 namespace details {
-static constexpr auto get_endian() -> std::endian {
+static constexpr auto serialize_endian() -> char {
   if constexpr (std::endian::native == std::endian::little) {
-    return std::endian::little;
+    return 'l';
   } else if constexpr (std::endian::native == std::endian::big) {
-    return std::endian::big;
+    return 'B';
   } else {
     []<bool flag = false> {
       static_assert(flag, "Mixed endian unsupported");
     };
   }
 }
+}
+
 enum struct message_type_e : std::uint8_t {
   invalid = 0,    // This is an invalid type.
   method_call,    // Method call. This message type may prompt a reply.
@@ -27,8 +32,20 @@ enum struct message_type_e : std::uint8_t {
   error,          // Error reply. If the first argument exists and is a string, it is an error message.
   signal,         // Signal emission.
 };
+// enum struct message_field_e : std::uint8_t {
+//   invalid = 0,  // Not a valid field name (error if it appears in a message)
+//   path,         // The object to send a call to, or the object a signal is emitted from.
+//   interface,    // The interface to invoke a method call on, or that a signal is emitted from.
+//   member,       // The member, either the method name or signal name.
+//   error_name,   // The name of the error that occurred, for errors
+//   reply_serial,  // The serial number of the message this message is a reply to. (The serial number is the second UINT32 in the header.)
+//   destination,   // The name of the connection this message is intended for.
+//   sender,        // Unique name of the sending connection.
+//   signature,     // The signature of the message body.
+//   unix_fds,      // The number of Unix file descriptors that accompany the message.
+// };
 
-struct flags {
+struct flags_t {
   /// This message does not expect method return replies or error replies, even if it is of a type that can have a reply;
   /// the reply should be omitted.
   bool no_reply_expected : 1 { false };
@@ -57,11 +74,11 @@ struct flags {
     return static_cast<std::byte>(bits.to_ulong());
   }
 };
-static_assert(sizeof(flags) == 1);
-static_assert(std::is_standard_layout_v<flags>);
-static_assert(static_cast<std::byte>(flags{ .no_reply_expected = true }) == std::byte{ 0x1 });
-static_assert(static_cast<std::byte>(flags{ .no_auto_start = true }) == std::byte{ 0x2 });
-static_assert(static_cast<std::byte>(flags{ .allow_interactive_authorization = true }) == std::byte{ 0x4 });
+static_assert(sizeof(flags_t) == 1);
+static_assert(std::is_standard_layout_v<flags_t>);
+static_assert(static_cast<std::byte>(flags_t{ .no_reply_expected = true }) == std::byte{ 0x1 });
+static_assert(static_cast<std::byte>(flags_t{ .no_auto_start = true }) == std::byte{ 0x2 });
+static_assert(static_cast<std::byte>(flags_t{ .allow_interactive_authorization = true }) == std::byte{ 0x4 });
 
 template <std::byte code_v, typename variant_t, message_type_e... required_in>
 struct header_field {
@@ -107,7 +124,11 @@ using field_signature = header_field<std::byte{ 8 }, std::string>;
 using field_unix_fds = header_field<std::byte{ 9 }, std::uint32_t>;
 
 struct field {
-  std::byte code{};
+  constexpr auto code() -> std::byte {
+    return std::visit([]<typename value_t>(value_t&&) -> std::byte {
+      return std::decay_t<value_t>::code;
+    }, value);
+  }
   std::variant<field_path,
                field_interface,
                field_member,
@@ -120,19 +141,24 @@ struct field {
       value;
 };
 
-}  // namespace details
+
+/*
+The signature of the header is: "yyyyuua(yv)"
+Written out more readably, this is:
+BYTE, BYTE, BYTE, BYTE, UINT32, UINT32, ARRAY of STRUCT of (BYTE,VARIANT)
+*/
 
 struct header {
   // Endianness flag; ASCII 'l' for little-endian or ASCII 'B' for big-endian. Both header and body are in this endianness.
-  static constexpr auto endian{ details::get_endian() };
+  static constexpr auto endian{ details::serialize_endian() };
   // Message type. Unknown types must be ignored.
-  details::message_type_e type{ details::message_type_e::invalid };
-  // Bitwise OR of flags.
-  details::flags flags{};
+  message_type_e type{ message_type_e::invalid };
+  // Bitwise OR of flags_t.
+  flags_t flags{};
   // Major protocol version of the sending application. If the major protocol version of the receiving application does not
   // match, the applications will not be able to communicate and the D-Bus connection must be disconnected. The major
   // protocol version for this version of the specification is 1.
-  static constexpr auto version{ std::byte{ 1 } };
+  static constexpr std::byte version{ 1 };
   // Length in bytes of the message body, starting from the end of the header. The header ends after its alignment padding to
   // an 8-boundary.
   std::uint32_t body_length{ 0 };
@@ -141,14 +167,14 @@ struct header {
   std::uint32_t serial{ 0 };
   // An array of zero or more header fields where the byte is the field code, and the variant is the field value. The message
   // type determines which fields are required.
-  std::vector<details::field> fields{};
+  std::vector<field> fields{};
 };
 
 }  // namespace adbus::protocol
 
 template <>
-struct adbus::protocol::meta<adbus::protocol::header> {
-  using type = adbus::protocol::header;
+struct adbus::protocol::meta<adbus::protocol::header::header> {
+  using type = adbus::protocol::header::header;
   static constexpr std::string_view name{ "header" };
   static constexpr auto value{
     pack(&type::endian, &type::type, &type::flags, &type::version, &type::body_length, &type::serial, &type::fields)

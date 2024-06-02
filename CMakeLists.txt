@@ -5,7 +5,9 @@ include(FeatureSummary)
 option(BUILD_TESTING "Build tests" ON)
 add_feature_info(BUILD_TESTING BUILD_TESTING "Build tests")
 
-set(CMAKE_CXX_STANDARD 23)
+#set(CMAKE_CXX_STANDARD 26)
+add_compile_options(-std=c++2c)
+#add_compile_options(-Wall -Wextra -Werror -Wpedantic -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function -Wno-unused-but-set-variable -Wno-unused-private-field -Wno-unused-const-variable -Wno-unused-value)
 
 include(cmake/CPM.cmake)
 

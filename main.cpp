@@ -6,10 +6,14 @@
 
 #include <adbus/protocol/signature.hpp>
 #include <adbus/protocol/message_header.hpp>
+#include <adbus/protocol/methods.hpp>
+#include <adbus/protocol/write.hpp>
 
-namespace boost::asio::dbus {
+namespace adbus {
 
-template <typename Executor = any_io_executor>
+namespace asio = boost::asio;
+
+template <typename Executor = asio::any_io_executor>
 class basic_dbus_socket {
 public:
   using executor_type = Executor;
@@ -18,7 +22,7 @@ public:
     requires std::same_as<std::remove_cvref_t<executor_in_t>, Executor>
   explicit basic_dbus_socket(executor_in_t&& executor) : socket_{ std::forward<executor_in_t>(executor) } {}
 
-  auto async_connect(auto&& endpoint, completion_token_for<void(std::error_code)> auto&& token) {
+  auto async_connect(auto&& endpoint, asio::completion_token_for<void(std::error_code)> auto&& token) {
     // https://dbus.freedesktop.org/doc/dbus-specification.html#auth-nul-byte
     enum struct state_e : std::uint8_t { connect, auth_nul_byte, complete };
     using std::string_literals::operator""s;
@@ -55,12 +59,12 @@ public:
     return hex;
   }
 
-  auto external_authenticate(completion_token_for<void(std::error_code, std::string_view)> auto&& token) {
+  auto external_authenticate(asio::completion_token_for<void(std::error_code, std::string_view)> auto&& token) {
     return external_authenticate(getuid(), std::forward<decltype(token)>(token));
   }
 
   /// \note https://dbus.freedesktop.org/doc/dbus-specification.html#auth-protocol
-  template <completion_token_for<void(std::error_code, std::string_view)> completion_token_t>
+  template <asio::completion_token_for<void(std::error_code, std::string_view)> completion_token_t>
   auto external_authenticate(decltype(getuid()) user_id, completion_token_t&& token)
       -> asio::async_result<std::decay_t<completion_token_t>, void(std::error_code, std::string_view)>::return_type {
     //  31303030 is ASCII decimal "1000" represented in hex, so
@@ -116,7 +120,7 @@ public:
 
 private:
   // todo windows using generic::stream_protocol::socket
-  local::stream_protocol::socket socket_;
+  asio::local::stream_protocol::socket socket_;
 };
 
 template <typename Executor>
@@ -139,30 +143,30 @@ using std::string_view_literals::operator""sv;
 int main() {
   asio::io_context ctx;
 
-  asio::dbus::basic_dbus_socket socket{ ctx };
+  adbus::basic_dbus_socket socket{ ctx };
 
-  std::string path{ getenv(asio::dbus::env::session.data()) };
-  path = std::regex_replace(path, std::regex(std::string{ asio::dbus::detail::unix_path_prefix }), "");
+  std::string path{ getenv(adbus::env::session.data()) };
+  path = std::regex_replace(path, std::regex(std::string{ adbus::detail::unix_path_prefix }), "");
 
   asio::local::stream_protocol::endpoint ep{ path };
 
-  fmt::print("Connecting to {}\n", ep.path());
+  fmt::println("Connecting to {}\n", ep.path());
 
   socket.async_connect(ep, [&socket](auto&& ec) {
     if (ec) {
-      fmt::print("error: {}\n", ec.message());
+      fmt::println("error: {}\n", ec.message());
       return;
     }
-    fmt::print("connected\n");
+    fmt::println("connected\n");
     socket.external_authenticate(
         [](std::error_code err, std::string_view msg) {
           // todo why does this not work in debug mode not running in debugger?
-          fmt::print("auth err {}: msg {}\n", err.message(), msg);
+          fmt::println("auth err {}: msg {}\n", err.message(), msg);
         });
   });
 
   ctx.run();
 
-  fmt::print("done\n");
+  fmt::println("done\n");
   return 0;
 }

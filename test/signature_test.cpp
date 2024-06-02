@@ -13,6 +13,9 @@
 
 namespace adbus::protocol::type {
 
+using util::join_v;
+using util::chars;
+
 static_assert(has_signature<std::uint8_t>);
 static_assert(has_signature<bool>);
 static_assert(has_signature<std::int16_t>);
@@ -66,6 +69,14 @@ static_assert(signature_v<std::unordered_map<int, std::string>> == "a{is}"sv);
 static_assert(signature_v<std::map<std::string, std::tuple<int, std::string>>> == "a{s(is)}"sv);
 // nested dicts
 static_assert(signature_v<std::map<std::string, std::map<std::string, std::string>>> == "a{sa{ss}}"sv);
+
+
+struct my_struct {
+  std::int32_t a;
+  std::string b;
+};
+
+static_assert(signature_v<my_struct> == "(is)"sv, join_v<chars<"got: \"">, signature_v<my_struct>, chars<"\" expected: \"(is)\"">>);
 
 }
 

@@ -6,6 +6,11 @@
 #include <string_view>
 #include <variant>
 
+#include <glaze/core/common.hpp>
+#include <glaze/reflection/to_tuple.hpp>
+#include <glaze/concepts/container_concepts.hpp>
+#include <glaze/util/tuple.hpp>
+
 #include <adbus/protocol/path.hpp>
 #include <adbus/util/string_literal.hpp>
 #include <adbus/util/concepts.hpp>
@@ -74,9 +79,8 @@ struct signature<type_t> {
   static constexpr auto value{ "s"sv };
 };
 
-template <typename type_t>
-  requires std::same_as<std::remove_cvref_t<type_t>, path>
-struct signature<type_t> {
+template <>
+struct signature<path> {
   static constexpr auto value{ "o"sv };
 };
 
@@ -98,7 +102,7 @@ struct signature<type_t> {
 };
 
 template <typename tuple_t>
-  requires concepts::is_specialization_v<tuple_t, std::tuple>
+  requires glz::detail::tuple_t<tuple_t> || glz::is_std_tuple<tuple_t>
 struct signature<tuple_t> {
   template <typename type_t>
   struct join_impl;
@@ -109,13 +113,25 @@ struct signature<tuple_t> {
   static constexpr auto value{ join_impl<tuple_t>::value };
 };
 
-template <typename dict_t>
-  requires(concepts::is_specialization_v<dict_t, std::map> || concepts::is_specialization_v<dict_t, std::unordered_map>) &&
-          concepts::type::basic<typename dict_t::key_type>
+template <glz::detail::map_subscriptable dict_t>
+  requires concepts::type::basic<typename dict_t::key_type>
 struct signature<dict_t> {
   static constexpr auto value{
     util::join_v<util::chars<"a{">, signature_v<typename dict_t::key_type>, signature_v<typename dict_t::mapped_type>, util::chars<"}">>
   };
+};
+
+template <glz::detail::reflectable T>
+struct signature<T> {
+  template <typename... Ts>
+  static consteval std::string_view unwrap_tuple(std::tuple<Ts...>) noexcept {
+    using util::chars;
+    return util::join_v<chars<"(">, signature_v<std::decay_t<Ts>>..., chars<")">>;
+  }
+  static consteval std::string_view impl() noexcept {
+    return unwrap_tuple(glz::detail::to_tuple(T{}));
+  }
+  static constexpr auto value{ impl() };
 };
 
 template <has_signature... types_t>
