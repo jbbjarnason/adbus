@@ -3,7 +3,7 @@
 #include <concepts>
 #include <string_view>
 
-#include "tuplet/tuplet.hpp"
+#include <glaze/tuplet/tuple.hpp>
 
 namespace adbus::protocol {
 
@@ -26,9 +26,9 @@ concept meta_t = requires {
 
 constexpr auto pack(auto&&... args) {
   if constexpr (sizeof...(args) == 0) {
-    return detail::pack_t{ tuplet::tuple{} };
+    return detail::pack_t{ glz::tuplet::tuple{} };
   } else {
-    return detail::pack_t{ tuplet::tuple{ std::forward<decltype(args)>(args)... } };
+    return detail::pack_t{ glz::tuplet::tuple{ std::forward<decltype(args)>(args)... } };
   }
 }
 
