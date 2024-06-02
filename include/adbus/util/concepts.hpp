@@ -92,14 +92,14 @@ concept basic = fixed<type_t> || string_like<type_t>;
 
 // ARRAY, STRUCT, DICT_ENTRY, VARIANT
 // Todo make this more generalized
-template <typename type_t>
-concept container = [] {
-  using t = std::remove_cvref_t<type_t>;
-  return requires {
-    requires is_specialization_v<t, std::vector> || is_specialization_v<t, std::map> || is_specialization_v<t, std::unordered_map> ||
-                 is_specialization_v<t, std::tuple> || is_specialization_v<t, std::variant>;
-  };
-}();
+// template <typename type_t>
+// concept container = [] {
+//   using t = std::remove_cvref_t<type_t>;
+//   return requires {
+//     requires is_specialization_v<t, std::vector> || is_specialization_v<t, std::map> || is_specialization_v<t, std::unordered_map> ||
+//                  is_specialization_v<t, std::tuple> || is_specialization_v<t, std::variant>;
+//   };
+// }();
 
 }  // namespace type
 

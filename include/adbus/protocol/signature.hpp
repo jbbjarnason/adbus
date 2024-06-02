@@ -6,16 +6,9 @@
 #include <string_view>
 #include <variant>
 
-#include <adbus/util/string_literal.hpp>
 #include <adbus/protocol/path.hpp>
-
-// for testing
-#include <array>
+#include <adbus/util/string_literal.hpp>
 #include <adbus/util/concepts.hpp>
-#include <set>
-#include <tuple>
-#include <glaze/tuplet/tuple.hpp>
-#include <vector>
 
 namespace adbus::protocol::type {
 
@@ -93,55 +86,16 @@ concept has_signature = requires {
   requires std::same_as<std::remove_const_t<decltype(signature<type_t>::value)>, std::string_view>;
 };
 
-static_assert(has_signature<std::uint8_t>);
-static_assert(has_signature<bool>);
-static_assert(has_signature<std::int16_t>);
-static_assert(has_signature<std::uint16_t>);
-static_assert(has_signature<std::int32_t>);
-static_assert(has_signature<std::uint32_t>);
-static_assert(has_signature<std::int64_t>);
-static_assert(has_signature<std::uint64_t>);
-static_assert(has_signature<double>);
-static_assert(has_signature<std::string_view>);
-static_assert(has_signature<std::string>);
-static_assert(has_signature<path>);
-
-static_assert(not has_signature<char*>);
-static_assert(not has_signature<const char*>);
-static_assert(not has_signature<std::int8_t>);
-
-static_assert(signature_v<std::uint8_t> == "y"sv);
-static_assert(signature_v<bool> == "b"sv);
-static_assert(signature_v<std::int16_t> == "n"sv);
-static_assert(signature_v<std::uint16_t> == "q"sv);
-static_assert(signature_v<std::int32_t> == "i"sv);
-static_assert(signature_v<std::uint32_t> == "u"sv);
-static_assert(signature_v<std::int64_t> == "x"sv);
-static_assert(signature_v<std::uint64_t> == "t"sv);
-static_assert(signature_v<double> == "d"sv);
-static_assert(signature_v<std::string_view> == "s"sv);
-static_assert(signature_v<std::string> == "s"sv);
-static_assert(signature_v<path> == "o"sv);
-
 template <has_signature type_t, has_signature... types_t>
 struct signature<std::variant<type_t, types_t...>> {
   static constexpr auto value{ "v"sv };
 };
-
-static_assert(signature_v<std::variant<std::uint8_t>> == "v"sv);
-static_assert(signature_v<std::variant<std::uint8_t, std::string>> == "v"sv);
-static_assert(has_signature<std::variant<std::uint8_t, std::string>>);
-static_assert(!has_signature<std::variant<std::int8_t>>);
 
 template <std::ranges::range type_t>
   requires has_signature<std::ranges::range_value_t<type_t>>
 struct signature<type_t> {
   static constexpr auto value{ util::join_v<util::chars<"a">, signature_v<std::ranges::range_value_t<type_t>>> };
 };
-
-static_assert(signature_v<std::vector<int>> == "ai"sv);
-static_assert(signature_v<std::array<int, 10>> == "ai"sv);
-static_assert(signature_v<std::set<int>> == "ai"sv);
 
 template <typename tuple_t>
   requires concepts::is_specialization_v<tuple_t, std::tuple>
@@ -155,13 +109,6 @@ struct signature<tuple_t> {
   static constexpr auto value{ join_impl<tuple_t>::value };
 };
 
-static_assert(signature_v<std::tuple<int, std::string>> == "(is)"sv);
-static_assert(signature_v<std::tuple<int, std::string, std::uint8_t>> == "(isy)"sv);
-static_assert(signature_v<std::tuple<int, std::array<std::uint8_t, 10>>> == "(iay)"sv);
-static_assert(signature_v<std::tuple<int, std::tuple<std::uint8_t, std::string>>> == "(i(ys))"sv);
-static_assert(signature_v<std::tuple<int, std::tuple<std::uint8_t, std::tuple<std::string, std::uint8_t>>>> ==
-              "(i(y(sy)))"sv);
-
 template <typename dict_t>
   requires(concepts::is_specialization_v<dict_t, std::map> || concepts::is_specialization_v<dict_t, std::unordered_map>) &&
           concepts::type::basic<typename dict_t::key_type>
@@ -170,11 +117,6 @@ struct signature<dict_t> {
     util::join_v<util::chars<"a{">, signature_v<typename dict_t::key_type>, signature_v<typename dict_t::mapped_type>, util::chars<"}">>
   };
 };
-static_assert(signature_v<std::map<int, std::string>> == "a{is}"sv);
-static_assert(signature_v<std::unordered_map<int, std::string>> == "a{is}"sv);
-static_assert(signature_v<std::map<std::string, std::tuple<int, std::string>>> == "a{s(is)}"sv);
-// nested dicts
-static_assert(signature_v<std::map<std::string, std::map<std::string, std::string>>> == "a{sa{ss}}"sv);
 
 template <has_signature... types_t>
 std::string_view constexpr composed_signature(types_t&&... types) {

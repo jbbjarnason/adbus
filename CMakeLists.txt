@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.26)
 project(adbus)
 
+include(FeatureSummary)
+option(BUILD_TESTING "Build tests" ON)
+add_feature_info(BUILD_TESTING BUILD_TESTING "Build tests")
+
 set(CMAKE_CXX_STANDARD 23)
 
 include(cmake/CPM.cmake)
@@ -22,3 +26,7 @@ target_link_libraries(adbus INTERFACE fmt::fmt glaze::glaze)
 
 add_executable(adbus_example main.cpp)
 target_link_libraries(adbus_example PRIVATE adbus::adbus)
+
+if (BUILD_TESTING)
+  add_subdirectory(test)
+endif()
