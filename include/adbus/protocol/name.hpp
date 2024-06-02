@@ -6,8 +6,8 @@
 #include <string_view>
 #include <system_error>
 
-#include "meta.hpp"
-#include "context.hpp"
+#include <adbus/protocol/meta.hpp>
+#include <adbus/core/context.hpp>
 
 namespace adbus::protocol {
 

@@ -6,12 +6,12 @@
 #include <string_view>
 #include <variant>
 
-#include "string_view_join.hpp"
-#include "path.hpp"
+#include <adbus/util/string_literal.hpp>
+#include <adbus/protocol/path.hpp>
 
 // for testing
 #include <array>
-#include <concepts.hpp>
+#include <adbus/util/concepts.hpp>
 #include <set>
 #include <tuple>
 #include <glaze/tuplet/tuple.hpp>
@@ -136,8 +136,7 @@ static_assert(!has_signature<std::variant<std::int8_t>>);
 template <std::ranges::range type_t>
   requires has_signature<std::ranges::range_value_t<type_t>>
 struct signature<type_t> {
-  static constexpr auto prefix{ "a"sv };
-  static constexpr auto value{ details::join_v<prefix, signature_v<std::ranges::range_value_t<type_t>>> };
+  static constexpr auto value{ util::join_v<util::chars<"a">, signature_v<std::ranges::range_value_t<type_t>>> };
 };
 
 static_assert(signature_v<std::vector<int>> == "ai"sv);
@@ -147,13 +146,11 @@ static_assert(signature_v<std::set<int>> == "ai"sv);
 template <typename tuple_t>
   requires concepts::is_specialization_v<tuple_t, std::tuple>
 struct signature<tuple_t> {
-  static constexpr auto prefix{ "("sv };
-  static constexpr auto postfix{ ")"sv };
   template <typename type_t>
   struct join_impl;
   template <typename... types_t>
   struct join_impl<std::tuple<types_t...>> {
-    static constexpr auto value{ details::join_v<prefix, signature_v<types_t>..., postfix> };
+    static constexpr auto value{ util::join_v<util::chars<"(">, signature_v<types_t>..., util::chars<")">> };
   };
   static constexpr auto value{ join_impl<tuple_t>::value };
 };
@@ -169,10 +166,8 @@ template <typename dict_t>
   requires(concepts::is_specialization_v<dict_t, std::map> || concepts::is_specialization_v<dict_t, std::unordered_map>) &&
           concepts::type::basic<typename dict_t::key_type>
 struct signature<dict_t> {
-  static constexpr auto prefix{ "a{"sv };
-  static constexpr auto postfix{ "}"sv };
   static constexpr auto value{
-    details::join_v<prefix, signature_v<typename dict_t::key_type>, signature_v<typename dict_t::mapped_type>, postfix>
+    util::join_v<util::chars<"a{">, signature_v<typename dict_t::key_type>, signature_v<typename dict_t::mapped_type>, util::chars<"}">>
   };
 };
 static_assert(signature_v<std::map<int, std::string>> == "a{is}"sv);

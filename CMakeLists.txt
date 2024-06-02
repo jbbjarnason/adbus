@@ -13,6 +13,12 @@ CPMAddPackage(
 )
 
 find_package(fmt CONFIG REQUIRED)
-add_executable(adbus main.cpp)
-target_link_libraries(adbus PRIVATE fmt::fmt glaze::glaze)
-target_include_directories(adbus PRIVATE ${CMAKE_CURRENT_LIST_DIR})
+find_package(glaze REQUIRED)
+
+add_library(adbus INTERFACE)
+add_library(adbus::adbus ALIAS adbus)
+target_include_directories(adbus INTERFACE ${CMAKE_CURRENT_LIST_DIR}/include)
+target_link_libraries(adbus INTERFACE fmt::fmt glaze::glaze)
+
+add_executable(adbus_example main.cpp)
+target_link_libraries(adbus_example PRIVATE adbus::adbus)

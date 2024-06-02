@@ -17,7 +17,7 @@ enum struct error_code : std::uint8_t {
   multiple_dots,
 };
 
-struct error {
+struct error final {
   using index_t = std::size_t;
 
   constexpr explicit operator bool() const noexcept { return code != error_code::no_error; }
@@ -26,5 +26,12 @@ struct error {
   error_code code{ error_code::no_error };
   index_t index{ 0 };
 };
+
+struct context final {
+  error err{};
+};
+
+template <class T>
+concept is_context = std::same_as<std::decay_t<T>, context>;
 
 }  // namespace adbus::protocol

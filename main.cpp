@@ -4,8 +4,8 @@
 #include <fmt/format.h>
 #include <boost/asio.hpp>
 
-#include "signature.hpp"
-#include "message_header.hpp"
+#include <adbus/protocol/signature.hpp>
+#include <adbus/protocol/message_header.hpp>
 
 namespace boost::asio::dbus {
 

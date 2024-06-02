@@ -5,7 +5,7 @@
 #include <string>
 #include <string_view>
 
-#include "context.hpp"
+#include <adbus/core/context.hpp>
 
 namespace adbus::protocol {
 
