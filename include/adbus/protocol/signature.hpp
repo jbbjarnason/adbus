@@ -7,6 +7,7 @@
 #include <variant>
 
 #include <glaze/core/common.hpp>
+#include <glaze/core/meta.hpp>
 #include <glaze/reflection/to_tuple.hpp>
 #include <glaze/concepts/container_concepts.hpp>
 #include <glaze/util/tuple.hpp>
@@ -121,11 +122,25 @@ struct signature<dict_t> {
   };
 };
 
+template<typename T>
+static consteval bool check_signature() {
+#if __cpp_static_assert >= 202306L
+  using glz::name_v;
+  using util::join_v;
+  using util::chars;
+  static_assert(has_signature<T>, join_v<chars<"Signature for given type: \"">, name_v<T>, chars<"\", please consider adding it">>);
+#else
+  static_assert(has_signature<T>, "type does not have a signature");
+#endif
+  return true;
+}
+
 template <glz::detail::reflectable T>
 struct signature<T> {
   template <typename... Ts>
   static consteval std::string_view unwrap_tuple(std::tuple<Ts...>) noexcept {
     using util::chars;
+    (check_signature<std::decay_t<Ts>>(), ...);
     return util::join_v<chars<"(">, signature_v<std::decay_t<Ts>>..., chars<")">>;
   }
   static consteval std::string_view impl() noexcept {

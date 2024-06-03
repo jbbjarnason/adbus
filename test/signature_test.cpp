@@ -70,13 +70,22 @@ static_assert(signature_v<std::map<std::string, std::tuple<int, std::string>>> =
 // nested dicts
 static_assert(signature_v<std::map<std::string, std::map<std::string, std::string>>> == "a{sa{ss}}"sv);
 
-
 struct my_struct {
   std::int32_t a;
   std::string b;
 };
-
 static_assert(signature_v<my_struct> == "(is)"sv, join_v<chars<"got: \"">, signature_v<my_struct>, chars<"\" expected: \"(is)\"">>);
+
+struct my_struct2 {
+  std::int32_t a;
+  std::string b;
+  std::uint8_t c;
+  char d;
+  my_struct e;
+};
+static_assert(signature_v<my_struct2> == "(isyc(is))"sv, join_v<chars<"got: \"">, signature_v<my_struct2>, chars<"\" expected: \"(isyc(is))\"">>);
+
+}  // namespace adbus::protocol::type
 
 }
 
