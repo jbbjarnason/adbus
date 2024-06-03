@@ -104,6 +104,8 @@ struct glz::meta<my_struct3> {
   static constexpr auto value{ glz::object("a", &self::a, "b", &self::b, "c", &self::c, "d", &self::d) };
 };
 
+using foo_t = glz::detail::Object<glz::tuplet::tuple<glz::tuplet::tuple<std::basic_string_view<char, std::char_traits<char> >, int my_struct3::*>, glz::tuplet::tuple<std::basic_string_view<char, std::char_traits<char> >, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > my_struct3::*>, glz::tuplet::tuple<std::basic_string_view<char, std::char_traits<char> >, unsigned char my_struct3::*>, glz::tuplet::tuple<std::basic_string_view<char, std::char_traits<char> >, adbus::protocol::type::my_struct my_struct3::*> > >;
+static_assert(glz::detail::glaze_object_t<my_struct3>);
 static_assert(signature_v<my_struct3> == "(isy(is))"sv, join_v<chars<"got: \"">, signature_v<my_struct3>, chars<"\" expected: \"(isy(is))\"">>);
 
 

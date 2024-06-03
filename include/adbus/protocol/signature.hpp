@@ -114,7 +114,7 @@ struct signature<type_t> {
 };
 
 template <typename tuple_t>
-  requires glz::detail::tuple_t<tuple_t> || glz::is_std_tuple<tuple_t>
+  requires glz::is_std_tuple<tuple_t> // glz::detail::tuple_t<tuple_t> ||
 struct signature<tuple_t> {
   template <typename type_t>
   struct join_impl;
@@ -134,7 +134,7 @@ struct signature<dict_t> {
 };
 
 template<typename T>
-static consteval bool check_signature() {
+static consteval bool assert_signature() {
 #if __cpp_static_assert >= 202306L
   using glz::name_v;
   using util::join_v;
@@ -151,7 +151,7 @@ struct signature<T> {
   template <typename... Ts>
   static consteval std::string_view unwrap_tuple(std::tuple<Ts...>) noexcept {
     using util::chars;
-    (check_signature<std::decay_t<Ts>>(), ...);
+    (assert_signature<std::decay_t<Ts>>(), ...);
     return util::join_v<chars<"(">, signature_v<std::decay_t<Ts>>..., chars<")">>;
   }
   static consteval std::string_view impl() noexcept {
@@ -160,9 +160,54 @@ struct signature<T> {
   static constexpr auto value{ impl() };
 };
 
-template <glz::detail::glaze_value_t T>
+template <glz::detail::glaze_t T>
 struct signature<T> {
-  static constexpr auto value{ "foo"sv };
+  // Example of a glaze Object
+  // glz::detail::Object<glz::tuplet::tuple<
+  //   glz::tuplet::tuple<std::basic_string_view<char, std::char_traits<char> >, int my_struct3::*>,
+  //   glz::tuplet::tuple<std::basic_string_view<char, std::char_traits<char> >, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > my_struct3::*>,
+  //   glz::tuplet::tuple<std::basic_string_view<char, std::char_traits<char> >, unsigned char my_struct3::*>,
+  //   glz::tuplet::tuple<std::basic_string_view<char, std::char_traits<char> >, adbus::protocol::type::my_struct my_struct3::*> > >;
+  template <typename unused, typename member_pointer, typename... Ts>
+  static consteval std::size_t unwrap_inner_tuple_size(glz::tuplet::tuple<unused, member_pointer, Ts...>) noexcept {
+    using member_type = typename glz::member_value<member_pointer>::type;
+    assert_signature<std::decay_t<member_type>>();
+    return signature_v<std::decay_t<member_type>>.size();
+  }
+  template <std::size_t N, typename unused, typename member_pointer, typename... Ts>
+  static consteval void unwrap_inner_tuple(std::array<char, N>& buffer, std::size_t& idx, glz::tuplet::tuple<unused, member_pointer, Ts...>) noexcept {
+    using member_type = typename glz::member_value<member_pointer>::type;
+    assert_signature<std::decay_t<member_type>>();
+    constexpr std::string_view signature{ signature_v<std::decay_t<member_type>> };
+    std::copy(std::begin(signature), std::end(signature), std::begin(buffer) + idx);
+  }
+  template <typename... Ts>
+  static consteval auto unwrap_tuple(glz::tuplet::tuple<Ts...>) noexcept {
+    using util::join_v;
+    constexpr std::size_t N{ (unwrap_inner_tuple_size(Ts{}) + ...) };
+    std::array<char, N + 1> buffer{};
+    std::size_t idx{};
+    (unwrap_inner_tuple(buffer, idx, Ts{}), ...);
+    return buffer;
+  }
+  static consteval auto impl() noexcept {
+    constexpr auto wrapper = glz::meta_wrapper_v<T>;
+    if constexpr (glz::detail::glaze_object_t<T>) {
+      return unwrap_tuple(wrapper.value);
+    }
+    else {
+#if __cpp_static_assert >= 202306L
+      using util::join_v;
+      using util::chars;
+      using wrapper_t = glz::meta_wrapper_t<T>;
+      static_assert(glz::false_v<T>, join_v<chars<"Todo implement signature for \"">, glz::name_v<wrapper_t>, chars<"\" other glaze types">>);
+#else
+      static_assert(glz::false_v<T>, "Todo implement signature for other glaze types");
+#endif
+    }
+  }
+  static constexpr auto static_arr{ impl() };
+  static constexpr std::string_view value{static_arr.data(), static_arr.size() - 1};
 };
 
 template <typename T>
