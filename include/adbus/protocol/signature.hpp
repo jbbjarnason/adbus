@@ -20,8 +20,19 @@ namespace adbus::protocol::type {
 
 using std::string_view_literals::operator""sv;
 
-template <typename T>
-struct signature : std::false_type {};
+template <typename T = void>
+struct signature {
+//   static constexpr auto impl() -> std::string_view {
+// #if __cpp_static_assert >= 202306L
+//     static_assert(glz::false_v<T>, util::join_v<util::chars<"No signature for given type: \"">, glz::name_v<T>, util::chars<"\"">>);
+// #else
+//     static_assert(glz::false_v<T>, "No signature for given type");
+// #endif
+//
+//     return "foo"sv;
+//   }
+//   static constexpr auto value{ "foo"sv };
+};
 
 template <typename type_t>
 static constexpr auto signature_v{ signature<type_t>::value };
@@ -128,7 +139,7 @@ static consteval bool check_signature() {
   using glz::name_v;
   using util::join_v;
   using util::chars;
-  static_assert(has_signature<T>, join_v<chars<"Signature for given type: \"">, name_v<T>, chars<"\", please consider adding it">>);
+  static_assert(has_signature<T>, join_v<chars<"Missing signature for given type: \"">, name_v<T>, chars<"\", please consider adding it">>);
 #else
   static_assert(has_signature<T>, "type does not have a signature");
 #endif

@@ -11,10 +11,14 @@
 #include <adbus/util/concepts.hpp>
 #include <adbus/protocol/signature.hpp>
 
-namespace adbus::protocol::type {
+using std::string_view_literals::operator ""sv;
+using adbus::util::join_v;
+using adbus::util::chars;
 
-using util::join_v;
-using util::chars;
+template <typename T>
+static constexpr auto signature_v = adbus::protocol::type::signature_v<T>;
+
+namespace adbus::protocol::type {
 
 static_assert(has_signature<std::uint8_t>);
 static_assert(has_signature<bool>);
@@ -71,20 +75,37 @@ static_assert(signature_v<std::map<std::string, std::tuple<int, std::string>>> =
 static_assert(signature_v<std::map<std::string, std::map<std::string, std::string>>> == "a{sa{ss}}"sv);
 
 struct my_struct {
-  std::int32_t a;
-  std::string b;
+  std::int32_t a{};
+  std::string b{};
 };
 static_assert(signature_v<my_struct> == "(is)"sv, join_v<chars<"got: \"">, signature_v<my_struct>, chars<"\" expected: \"(is)\"">>);
 
 struct my_struct2 {
-  std::int32_t a;
-  std::string b;
-  std::uint8_t c;
-  my_struct e;
+  std::int32_t a{};
+  std::string b{};
+  std::uint8_t c{};
+  my_struct d{};
 };
 static_assert(signature_v<my_struct2> == "(isy(is))"sv, join_v<chars<"got: \"">, signature_v<my_struct2>, chars<"\" expected: \"(isy(is))\"">>);
 
 }  // namespace adbus::protocol::type
+
+struct my_struct3 {
+  explicit my_struct3(std::int32_t aa) : a{ aa } {}
+  std::int32_t a{};
+  std::string b{};
+  std::uint8_t c{};
+  adbus::protocol::type::my_struct d{};
+};
+
+template <>
+struct glz::meta<my_struct3> {
+  using self = my_struct3;
+  static constexpr auto value{ glz::object("a", &self::a, "b", &self::b, "c", &self::c, "d", &self::d) };
+};
+
+static_assert(signature_v<my_struct3> == "(isy(is))"sv, join_v<chars<"got: \"">, signature_v<my_struct3>, chars<"\" expected: \"(isy(is))\"">>);
+
 
 int main() {
   return 0;
