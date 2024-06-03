@@ -180,13 +180,17 @@ struct signature<T> {
     assert_signature<std::decay_t<member_type>>();
     constexpr std::string_view signature{ signature_v<std::decay_t<member_type>> };
     std::copy(std::begin(signature), std::end(signature), std::begin(buffer) + idx);
+    idx += signature.size();
   }
   template <typename... Ts>
   static consteval auto unwrap_tuple(glz::tuplet::tuple<Ts...>) noexcept {
     using util::join_v;
     constexpr std::size_t N{ (unwrap_inner_tuple_size(Ts{}) + ...) };
-    std::array<char, N + 1> buffer{};
-    std::size_t idx{};
+    // N + 3 for () and null terminator
+    std::array<char, N + 3> buffer{};
+    buffer[0] = '(';
+    buffer[N + 1] = ')';
+    std::size_t idx{ 1 };
     (unwrap_inner_tuple(buffer, idx, Ts{}), ...);
     return buffer;
   }
