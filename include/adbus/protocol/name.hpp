@@ -6,7 +6,6 @@
 #include <string_view>
 #include <system_error>
 
-#include <adbus/protocol/meta.hpp>
 #include <adbus/core/context.hpp>
 
 namespace adbus::protocol {
@@ -146,20 +145,20 @@ static_assert(member_name::validate("org-freedesktop..DBus") == error{.code=erro
 
 }  // namespace adbus::protocol
 
-template<>
-struct adbus::protocol::meta<adbus::protocol::interface_name> {
-  static constexpr std::string_view name{ "adbus::protocol::interface_name" };
-  static constexpr auto value{ &adbus::protocol::interface_name::value };
-};
-
-template<>
-struct adbus::protocol::meta<adbus::protocol::bus_name> {
-  static constexpr std::string_view name{ "adbus::protocol::bus_name" };
-  static constexpr auto value{ &adbus::protocol::bus_name::value };
-};
-
-template<>
-struct adbus::protocol::meta<adbus::protocol::member_name> {
-  static constexpr std::string_view name{ "adbus::protocol::member_name" };
-  static constexpr auto value{ &adbus::protocol::member_name::value };
-};
+// template<>
+// struct adbus::protocol::meta<adbus::protocol::interface_name> {
+//   static constexpr std::string_view name{ "adbus::protocol::interface_name" };
+//   static constexpr auto value{ &adbus::protocol::interface_name::value };
+// };
+//
+// template<>
+// struct adbus::protocol::meta<adbus::protocol::bus_name> {
+//   static constexpr std::string_view name{ "adbus::protocol::bus_name" };
+//   static constexpr auto value{ &adbus::protocol::bus_name::value };
+// };
+//
+// template<>
+// struct adbus::protocol::meta<adbus::protocol::member_name> {
+//   static constexpr std::string_view name{ "adbus::protocol::member_name" };
+//   static constexpr auto value{ &adbus::protocol::member_name::value };
+// };

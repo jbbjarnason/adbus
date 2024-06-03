@@ -1,13 +1,17 @@
 #pragma once
 
-#include <bitset>
 #include <bit>
+#include <bitset>
 #include <variant>
 #include <vector>
 
-#include <adbus/protocol/meta.hpp>
 #include <adbus/protocol/name.hpp>
 #include <adbus/protocol/path.hpp>
+
+namespace adbus::protocol::type {
+template <typename T>
+struct signature;
+}  // namespace adbus::protocol::type
 
 namespace adbus::protocol::header {
 
@@ -124,21 +128,16 @@ using field_signature = header_field<std::byte{ 8 }, std::string>;
 using field_unix_fds = header_field<std::byte{ 9 }, std::uint32_t>;
 
 struct field {
-  constexpr auto code() -> std::byte {
+  // field(auto&& in_place_type, auto&& val) : code{ make_code(variant_t{in_place_type}) }, value{ in_place_type, std::forward<decltype(val)>(val) } {}
+  using variant_t = std::variant<field_path, field_interface, field_member, field_error_name, field_reply_serial, field_destination, field_sender, field_signature, field_unix_fds>;
+  const std::byte code{};
+  variant_t value;
+private:
+  static constexpr auto make_code(variant_t&& val) -> std::byte {
     return std::visit([]<typename value_t>(value_t&&) -> std::byte {
       return std::decay_t<value_t>::code;
-    }, value);
+    }, val);
   }
-  std::variant<field_path,
-               field_interface,
-               field_member,
-               field_error_name,
-               field_reply_serial,
-               field_destination,
-               field_sender,
-               field_signature,
-               field_unix_fds>
-      value;
 };
 
 
@@ -150,7 +149,7 @@ BYTE, BYTE, BYTE, BYTE, UINT32, UINT32, ARRAY of STRUCT of (BYTE,VARIANT)
 
 struct header {
   // Endianness flag; ASCII 'l' for little-endian or ASCII 'B' for big-endian. Both header and body are in this endianness.
-  static constexpr auto endian{ details::serialize_endian() };
+  const std::byte endian{ details::serialize_endian() };
   // Message type. Unknown types must be ignored.
   message_type_e type{ message_type_e::invalid };
   // Bitwise OR of flags_t.
@@ -158,7 +157,7 @@ struct header {
   // Major protocol version of the sending application. If the major protocol version of the receiving application does not
   // match, the applications will not be able to communicate and the D-Bus connection must be disconnected. The major
   // protocol version for this version of the specification is 1.
-  static constexpr std::byte version{ 1 };
+  const std::byte version{ 1 };
   // Length in bytes of the message body, starting from the end of the header. The header ends after its alignment padding to
   // an 8-boundary.
   std::uint32_t body_length{ 0 };
@@ -173,10 +172,11 @@ struct header {
 }  // namespace adbus::protocol
 
 template <>
-struct adbus::protocol::meta<adbus::protocol::header::header> {
-  using type = adbus::protocol::header::header;
-  static constexpr std::string_view name{ "header" };
-  static constexpr auto value{
-    pack(&type::endian, &type::type, &type::flags, &type::version, &type::body_length, &type::serial, &type::fields)
-  };
+struct adbus::protocol::type::signature<adbus::protocol::header::flags_t> {
+  static constexpr std::string_view value{ "y" };
+};
+
+template <>
+struct adbus::protocol::type::signature<adbus::protocol::header::field> {
+  static constexpr std::string_view value{ "(yv)" };
 };

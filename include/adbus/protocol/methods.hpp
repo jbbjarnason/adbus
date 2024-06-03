@@ -1,10 +1,11 @@
+#pragma once
 
 #include <adbus/protocol/message_header.hpp>
 
 namespace adbus::protocol::methods {
 
 auto hello() -> protocol::header::header {
-  using namespace adbus::protocol::header;
+  using namespace protocol::header;
   return {
     .type = message_type_e::method_call,
     .body_length = 0,

@@ -20,7 +20,7 @@ namespace adbus::protocol::type {
 
 using std::string_view_literals::operator""sv;
 
-template <typename type_t>
+template <typename T>
 struct signature : std::false_type {};
 
 template <typename type_t>
@@ -147,6 +147,15 @@ struct signature<T> {
     return unwrap_tuple(glz::detail::to_tuple(T{}));
   }
   static constexpr auto value{ impl() };
+};
+
+template <typename T>
+concept enum_c = std::is_enum_v<T>;
+
+// Todo make it optionally number or string
+template <enum_c T>
+struct signature<T> {
+  static constexpr auto value{ signature_v<std::underlying_type_t<T>> };
 };
 
 template <has_signature... types_t>
