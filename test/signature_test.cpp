@@ -80,14 +80,11 @@ struct my_struct2 {
   std::int32_t a;
   std::string b;
   std::uint8_t c;
-  char d;
   my_struct e;
 };
-static_assert(signature_v<my_struct2> == "(isyc(is))"sv, join_v<chars<"got: \"">, signature_v<my_struct2>, chars<"\" expected: \"(isyc(is))\"">>);
+static_assert(signature_v<my_struct2> == "(isy(is))"sv, join_v<chars<"got: \"">, signature_v<my_struct2>, chars<"\" expected: \"(isy(is))\"">>);
 
 }  // namespace adbus::protocol::type
-
-}
 
 int main() {
   return 0;

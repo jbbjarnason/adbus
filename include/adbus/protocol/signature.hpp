@@ -149,6 +149,11 @@ struct signature<T> {
   static constexpr auto value{ impl() };
 };
 
+template <glz::detail::glaze_value_t T>
+struct signature<T> {
+  static constexpr auto value{ "foo"sv };
+};
+
 template <typename T>
 concept enum_c = std::is_enum_v<T>;
 
