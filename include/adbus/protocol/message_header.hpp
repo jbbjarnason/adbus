@@ -8,6 +8,12 @@
 #include <adbus/protocol/name.hpp>
 #include <adbus/protocol/path.hpp>
 
+#include <glaze/core/common.hpp>
+
+namespace glz {
+template <typename T>
+struct meta;
+}  // namespace glz
 namespace adbus::protocol::type {
 template <typename T>
 struct signature;
