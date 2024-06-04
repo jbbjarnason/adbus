@@ -108,6 +108,26 @@ using foo_t = glz::detail::Object<glz::tuplet::tuple<glz::tuplet::tuple<std::bas
 static_assert(glz::detail::glaze_object_t<my_struct3>);
 static_assert(signature_v<my_struct3> == "(isy(is))"sv, join_v<chars<"got: \"">, signature_v<my_struct3>, chars<"\" expected: \"(isy(is))\"">>);
 
+enum struct enum_as_number : std::uint8_t {
+  a = 1,
+  b = 2,
+  c = 3,
+};
+static_assert(signature_v<enum_as_number> == "y"sv);
+
+enum struct enum_as_string : std::uint8_t {
+  a = 1,
+  b = 2,
+  c = 3,
+};
+template <>
+struct glz::meta<enum_as_string> {
+  using enum enum_as_string;
+  static constexpr auto value{ glz::enumerate("a", a, "b", b, "c", c) };
+};
+using foo = glz::detail::Enum<glz::tuplet::tuple<glz::tuplet::tuple<std::basic_string_view<char, std::char_traits<char> >, enum_as_string>, glz::tuplet::tuple<std::basic_string_view<char, std::char_traits<char> >, enum_as_string>, glz::tuplet::tuple<std::basic_string_view<char, std::char_traits<char> >, enum_as_string> > >;
+static_assert(glz::detail::glaze_enum_t<foo>);
+static_assert(signature_v<enum_as_string> == "s"sv);
 
 int main() {
   return 0;

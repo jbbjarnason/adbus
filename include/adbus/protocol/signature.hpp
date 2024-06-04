@@ -199,6 +199,11 @@ struct signature<T> {
     if constexpr (glz::detail::glaze_object_t<T>) {
       return unwrap_tuple(wrapper.value);
     }
+    else if (glz::detail::glaze_enum_t<T>) {
+      // example glz::enumerate("a", a, "b", b, "c", c);
+      // this is represented as string
+      return std::array{ 's', '\0' };
+    }
     else {
 #if __cpp_static_assert >= 202306L
       using util::join_v;
@@ -215,7 +220,7 @@ struct signature<T> {
 };
 
 template <typename T>
-concept enum_c = std::is_enum_v<T>;
+concept enum_c = std::is_enum_v<T> && !glz::detail::glaze_enum_t<T>;
 
 // Todo make it optionally number or string
 template <enum_c T>
