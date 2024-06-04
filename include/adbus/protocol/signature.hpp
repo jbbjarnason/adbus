@@ -42,38 +42,38 @@ struct signature<std::uint8_t> {
   static constexpr auto value{ "y"sv };
 };
 
-template <std::same_as<bool> value_t>
-struct signature<value_t> {
+template <>
+struct signature<bool> {
   static constexpr auto value{ "b"sv };
 };
 
-template <concepts::explicit_integral<std::int16_t> value_t>
-struct signature<value_t> {
+template <>
+struct signature<std::int16_t> {
   static constexpr auto value{ "n"sv };
 };
 
-template <concepts::explicit_integral<std::uint16_t> value_t>
-struct signature<value_t> {
+template <>
+struct signature<std::uint16_t> {
   static constexpr auto value{ "q"sv };
 };
 
-template <concepts::explicit_integral<std::int32_t> value_t>
-struct signature<value_t> {
+template <>
+struct signature<std::int32_t> {
   static constexpr auto value{ "i"sv };
 };
 
-template <concepts::explicit_integral<std::uint32_t> value_t>
-struct signature<value_t> {
+template <>
+struct signature<std::uint32_t> {
   static constexpr auto value{ "u"sv };
 };
 
-template <concepts::explicit_integral<std::int64_t> value_t>
-struct signature<value_t> {
+template <>
+struct signature<std::int64_t> {
   static constexpr auto value{ "x"sv };
 };
 
-template <concepts::explicit_integral<std::uint64_t> value_t>
-struct signature<value_t> {
+template <>
+struct signature<std::uint64_t> {
   static constexpr auto value{ "t"sv };
 };
 
@@ -84,9 +84,7 @@ struct signature<value_t> {
 
 // unix_fd ?
 
-template <typename type_t>
-  requires(std::same_as<std::remove_cvref_t<type_t>, std::string_view> ||
-           std::same_as<std::remove_cvref_t<type_t>, std::string>)
+template <glz::detail::string_like type_t>
 struct signature<type_t> {
   static constexpr auto value{ "s"sv };
 };
