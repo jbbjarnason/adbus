@@ -199,7 +199,7 @@ struct signature<T> {
     if constexpr (glz::detail::glaze_object_t<T>) {
       return unwrap_tuple(wrapper.value);
     }
-    else if (glz::detail::glaze_enum_t<T>) {
+    else if constexpr (glz::detail::glaze_enum_t<T>) {
       // example glz::enumerate("a", a, "b", b, "c", c);
       // this is represented as string
       return std::array{ 's', '\0' };
@@ -208,8 +208,7 @@ struct signature<T> {
 #if __cpp_static_assert >= 202306L
       using util::join_v;
       using util::chars;
-      using wrapper_t = glz::meta_wrapper_t<T>;
-      static_assert(glz::false_v<T>, join_v<chars<"Todo implement signature for \"">, glz::name_v<wrapper_t>, chars<"\" other glaze types">>);
+      static_assert(glz::false_v<T>, join_v<chars<"Todo implement signature for glaze type: \"">, glz::name_v<T>, chars<"\" other glaze types">>);
 #else
       static_assert(glz::false_v<T>, "Todo implement signature for other glaze types");
 #endif

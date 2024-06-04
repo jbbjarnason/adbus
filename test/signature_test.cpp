@@ -125,8 +125,6 @@ struct glz::meta<enum_as_string> {
   using enum enum_as_string;
   static constexpr auto value{ glz::enumerate("a", a, "b", b, "c", c) };
 };
-using foo = glz::detail::Enum<glz::tuplet::tuple<glz::tuplet::tuple<std::basic_string_view<char, std::char_traits<char> >, enum_as_string>, glz::tuplet::tuple<std::basic_string_view<char, std::char_traits<char> >, enum_as_string>, glz::tuplet::tuple<std::basic_string_view<char, std::char_traits<char> >, enum_as_string> > >;
-static_assert(glz::detail::glaze_enum_t<foo>);
 static_assert(signature_v<enum_as_string> == "s"sv);
 
 int main() {
