@@ -1,5 +1,11 @@
 #pragma once
 
+#include <algorithm>
+#include <expected>
+#include <type_traits>
+
+#include <glaze/concepts/container_concepts.hpp>
+
 #include <adbus/core/context.hpp>
 
 namespace adbus::protocol {
@@ -45,25 +51,34 @@ struct write;
  *                     descriptors need to be transferred out-of-band via some platform specific
  *                     mechanism. On the wire, values of this type store the index to the file
  *                     descriptor in the array of file descriptors that accompany the message.     4
+ *
+ * As an exception to natural alignment, STRUCT and DICT_ENTRY values are always aligned to an 8-byte boundary, regardless of the alignments of their contents.
 */
 template <typename T>
 concept trivially_copyable = std::is_trivially_copyable_v<T>;
 
-constexpr void dbus_marshall(trivially_copyable auto&& value, auto&& buffer, auto&& idx) noexcept {
+constexpr void dbus_marshall(trivially_copyable auto&& value,[[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
   using V = std::decay_t<decltype(value)>;
-  // Bool is a special case in dbus, it is aligned to 4 bytes
-  constexpr auto n = std::is_same_v<V, bool> ? sizeof(std::uint32_t) : sizeof(V);
-  if (idx + n > buffer.size()) [[unlikely]] {
-    buffer.resize((std::max)(buffer.size() * 2, idx + n));
+  constexpr auto n = sizeof(V);
+  if constexpr (glz::resizable<std::decay_t<decltype(buffer)>>) {
+    if (idx + n > buffer.size()) [[unlikely]] {
+      buffer.resize((std::max)(buffer.size() * 2, idx + n));
+    }
+  }
+  else {
+    if (idx + n > buffer.size()) [[unlikely]] {
+      ctx.err = error{.code = error_code::buffer_too_small};
+      return;
+    }
   }
 
   constexpr auto is_volatile = std::is_volatile_v<std::remove_reference_t<decltype(value)>>;
 
   if constexpr (is_volatile) {
     const V temp{ value };
-    std::memcpy(buffer.data() + idx, &temp, n);
+    std::copy_n(&temp, n, buffer.data() + idx);
   } else {
-    std::memcpy(buffer.data() + idx, &value, n);
+    std::copy_n(&value, n, buffer.data() + idx);
   }
 
   idx += n;
@@ -76,19 +91,48 @@ struct to_dbus_binary;
 template <>
 struct to_dbus_binary<bool>
 {
-  template <auto Opts>
-  inline static void op(auto&& value, is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept
+  template <options Opts>
+  static constexpr void op(auto&& value, is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept
   {
 
   }
 };
 
+template <>
+struct to_dbus_binary<std::uint8_t>
+{
+  template <options Opts>
+  static constexpr void op(auto&& value,[[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept
+  {
+    dbus_marshall(std::forward<decltype(value)>(value), std::forward<decltype(ctx)>(ctx), std::forward<decltype(buffer)>(buffer), std::forward<decltype(idx)>(idx));
+  }
+};
+
 }  // namespace detail
 
-inline auto write_dbus_binary(auto&& value, auto&& buffer) noexcept
+constexpr auto write_dbus_binary(auto&& value, auto&& buffer) noexcept -> error
 {
+  context ctx{};
+  std::size_t idx{ 0 };
+  detail::to_dbus_binary<std::decay_t<decltype(value)>>::template op<{}>(std::forward<decltype(value)>(value), ctx, buffer, idx);
+  return error{.code = error_code::no_error};
+}
 
+template <typename buffer_t = std::string>
+constexpr auto write_dbus_binary(auto&& value) noexcept -> std::expected<buffer_t, error> {
+  buffer_t buffer{};
+  if (auto err = write_dbus_binary(std::forward<decltype(value)>(value), buffer)) {
+    return std::unexpected(err);
+  }
+  return buffer;
 }
 
 }
 
+namespace test {
+
+static constexpr auto uint8_test { adbus::protocol::write_dbus_binary<std::array<std::uint8_t, 1>>(std::uint8_t{ 0x66 }) };
+static_assert(uint8_test.has_value());
+static_assert(uint8_test.value()[0] == 0x66);
+
+}

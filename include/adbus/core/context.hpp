@@ -6,6 +6,7 @@ namespace adbus::protocol {
 
 enum struct error_code : std::uint8_t {
   no_error = 0,
+  // path/name errors
   empty,
   path_not_absolute,  // does not start with slash
   trailing_slash,
@@ -15,6 +16,8 @@ enum struct error_code : std::uint8_t {
   too_long,
   trailing_dot,
   multiple_dots,
+  // write errors
+  buffer_too_small,
 };
 
 struct error final {
@@ -33,5 +36,9 @@ struct context final {
 
 template <class T>
 concept is_context = std::same_as<std::decay_t<T>, context>;
+
+struct options final {
+  bool enum_as_string{ false }; // todo implement
+};
 
 }  // namespace adbus::protocol
