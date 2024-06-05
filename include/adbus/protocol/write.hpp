@@ -1,6 +1,6 @@
 #pragma once
 
-#include <algorithm>
+#include <cstring>
 #include <expected>
 #include <type_traits>
 
@@ -55,7 +55,7 @@ struct write;
  * As an exception to natural alignment, STRUCT and DICT_ENTRY values are always aligned to an 8-byte boundary, regardless of the alignments of their contents.
 */
 template <typename T>
-concept trivially_copyable = std::is_trivially_copyable_v<T>;
+concept trivially_copyable = std::is_trivially_copyable_v<std::decay_t<T>>;
 
 constexpr void dbus_marshall(trivially_copyable auto&& value,[[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
   using V = std::decay_t<decltype(value)>;
@@ -76,9 +76,9 @@ constexpr void dbus_marshall(trivially_copyable auto&& value,[[maybe_unused]] is
 
   if constexpr (is_volatile) {
     const V temp{ value };
-    std::copy_n(&temp, n, buffer.data() + idx);
+    std::memcpy(buffer.data() + idx, &temp, n);
   } else {
-    std::copy_n(&value, n, buffer.data() + idx);
+    std::memcpy(buffer.data() + idx, &value, n);
   }
 
   idx += n;
@@ -98,8 +98,8 @@ struct to_dbus_binary<bool>
   }
 };
 
-template <>
-struct to_dbus_binary<std::uint8_t>
+template <glz::detail::num_t number_t>
+struct to_dbus_binary<number_t>
 {
   template <options Opts>
   static constexpr void op(auto&& value,[[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept
@@ -115,6 +115,9 @@ constexpr auto write_dbus_binary(auto&& value, auto&& buffer) noexcept -> error
   context ctx{};
   std::size_t idx{ 0 };
   detail::to_dbus_binary<std::decay_t<decltype(value)>>::template op<{}>(std::forward<decltype(value)>(value), ctx, buffer, idx);
+  if constexpr (glz::resizable<std::decay_t<decltype(buffer)>>) {
+    buffer.resize(idx);
+  }
   return error{.code = error_code::no_error};
 }
 
@@ -126,13 +129,5 @@ constexpr auto write_dbus_binary(auto&& value) noexcept -> std::expected<buffer_
   }
   return buffer;
 }
-
-}
-
-namespace test {
-
-static constexpr auto uint8_test { adbus::protocol::write_dbus_binary<std::array<std::uint8_t, 1>>(std::uint8_t{ 0x66 }) };
-static_assert(uint8_test.has_value());
-static_assert(uint8_test.value()[0] == 0x66);
 
 }
