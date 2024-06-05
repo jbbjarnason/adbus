@@ -68,5 +68,17 @@ int main() {
     expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare)));
   } | std::vector{ true, false };
 
+  "string"_test = [](auto value) {
+    std::string buffer{};
+    auto err = write_dbus_binary(value, buffer);
+    expect(!err);
+    expect(buffer.size() ==
+      sizeof(std::uint32_t) // The number in front of string indicating string len
+      + value.size() // The actual string length excluding any null terminator
+      + 1 // The null terminator
+      );
+    // auto compare = std::array<std::uint8_t, 4>{ static_cast<std::uint8_t>(value), 0x00, 0x00, 0x00 };
+    // expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare)));
+  } | std::tuple{ std::string{ "this is a message" }, std::string_view{ "this is a message" } };
 
 }
