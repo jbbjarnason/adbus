@@ -94,7 +94,7 @@ struct to_dbus_binary<bool>
   template <options Opts>
   static constexpr void op(auto&& value, is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept
   {
-
+    dbus_marshall(static_cast<std::uint32_t>(value), std::forward<decltype(ctx)>(ctx), std::forward<decltype(buffer)>(buffer), std::forward<decltype(idx)>(idx));
   }
 };
 

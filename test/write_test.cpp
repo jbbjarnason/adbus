@@ -35,7 +35,7 @@ constexpr auto format_as(number_test<number_type> test) -> std::string {
 int main() {
   using adbus::protocol::write_dbus_binary;
 
-  "integer types"_test = [](auto&& test) {
+  "number types"_test = [](auto&& test) {
     std::string buffer{};
     auto err = write_dbus_binary(test.value, buffer);
     expect(!err);
@@ -56,6 +56,17 @@ int main() {
     number_test<std::int32_t>{ .value = -0x12345678, .expected = { 0x88, 0xa9, 0xcb, 0xed } },
     number_test<std::int64_t>{ .value = -0x123456789abcdef0, .expected = { 0x10, 0x21, 0x43, 0x65, 0x87, 0xa9, 0xcb, 0xed } },
     number_test<double>{ .value = 1337.42, .expected = { 0x48, 0xe1, 0x7a, 0x14, 0xae, 0xe5, 0x94, 0x40 } },
+    number_test<double>{ .value = -1337.42, .expected = { 0x48, 0xe1, 0x7a, 0x14, 0xae, 0xe5, 0x94, 0xc0 } },
   };
+
+  "bool"_test = [](auto value) {
+    std::string buffer{};
+    auto err = write_dbus_binary(value, buffer);
+    expect(!err);
+    expect(buffer.size() == sizeof(std::uint32_t));
+    auto compare = std::array<std::uint8_t, 4>{ static_cast<std::uint8_t>(value), 0x00, 0x00, 0x00 };
+    expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare)));
+  } | std::vector{ true, false };
+
 
 }
