@@ -6,8 +6,10 @@
 #include <boost/ut.hpp>
 
 #include <adbus/protocol/write.hpp>
+#include <adbus/protocol/signature.hpp>
 
 using namespace boost::ut;
+using std::string_view_literals::operator ""sv;
 
 template <glz::detail::num_t type>
 struct number_test {
@@ -92,10 +94,65 @@ int main() {
     std::string value{};
     constexpr auto n{ static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()) + 10 };
     value.resize(n);
-    std::fill_n(std::begin(value), n, 'a');
     std::string buffer{};
     auto err = write_dbus_binary(value, buffer);
     expect(!!err);
     expect(err.code == adbus::protocol::error_code::string_too_long);
+  };
+
+  "signature"_test = []{
+    static_assert(adbus::concepts::type::is_signature<adbus::protocol::type::signature>);
+    struct foo {
+      struct bar {
+        std::string a{};
+        std::uint64_t b{};
+      };
+      std::uint64_t a{};
+      std::vector<bar> bars{};
+      std::vector<bar> bars2{};
+      std::string b{};
+    };
+    adbus::protocol::type::signature signature{ adbus::protocol::type::signature_v<foo> };
+    expect(std::string_view{ signature } == "(ta(st)a(st)s)"sv);
+    std::string buffer{};
+    auto err = write_dbus_binary(signature, buffer);
+    expect(!err);
+    expect(buffer.size() == 16);
+    auto compare = std::vector<std::uint8_t>{ signature.size(), '(', 't','a','(','s','t',')','a','(','s','t',')','s', ')', '\0' };
+
+    expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), [](auto&& a, auto&& b) {
+      auto foo =  static_cast<std::uint8_t>(a) == static_cast<std::uint8_t>(b);
+      if (!foo) {
+            fmt::print("a: {}, b: {}\n", a, b);
+      }
+      return foo;
+    }));
+  };
+
+  "alignment or padding"_test = [] {
+    std::string buffer{ "ab" }; // 2 bytes
+    auto err = write_dbus_binary(std::uint64_t{ 0x1234 }, buffer);
+    expect(!err);
+    const auto padding = 6; // 8 - 2
+    const auto size = 2 + padding + sizeof(std::uint64_t);
+    expect(buffer.size() == size) << fmt::format("Expected: {}, Got: {}", size, buffer.size());
+  };
+
+  "vector"_test = [] {
+    std::vector<std::uint64_t> value{ 10, 20, 30 };
+    std::string buffer{};
+    auto err = write_dbus_binary(value, buffer);
+    expect(!err);
+    const auto padding{ 4 }; // todo alignement of std::uint64_t - alignment of std::uint32_t
+    const auto size{ sizeof(std::uint32_t) + padding + value.size() * sizeof(std::uint64_t) };
+    expect(buffer.size() == size);
+    // auto compare = std::vector<std::uint8_t>{ static_cast<std::uint8_t>(value.size()), 0, 0, 0, 0x12, 0x34, 0x56, 0x78 };
+    // expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), [](auto&& a, auto&& b) {
+      // auto foo =  static_cast<std::uint8_t>(a) == static_cast<std::uint8_t>(b);
+      // if (!foo) {
+            // fmt::print("a: {}, b: {}\n", a, b);
+      // }
+      // return foo;
+    // }));
   };
 }

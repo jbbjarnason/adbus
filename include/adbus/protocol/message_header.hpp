@@ -16,7 +16,7 @@ struct meta;
 }  // namespace glz
 namespace adbus::protocol::type {
 template <typename T>
-struct signature;
+struct signature_meta;
 }  // namespace adbus::protocol::type
 
 namespace adbus::protocol::header {
@@ -178,11 +178,11 @@ struct header {
 }  // namespace adbus::protocol
 
 template <>
-struct adbus::protocol::type::signature<adbus::protocol::header::flags_t> {
+struct adbus::protocol::type::signature_meta<adbus::protocol::header::flags_t> {
   static constexpr std::string_view value{ "y" };
 };
 
 template <>
-struct adbus::protocol::type::signature<adbus::protocol::header::field> {
+struct adbus::protocol::type::signature_meta<adbus::protocol::header::field> {
   static constexpr std::string_view value{ "(yv)" };
 };

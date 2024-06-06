@@ -8,6 +8,14 @@
 namespace adbus::concepts {
 
 namespace type {
+
+// check if type has static constexpr boolean named dbus_signature
+template <typename T>
+concept is_signature = requires {
+  requires std::is_class_v<T>;
+  requires T::dbus_signature;
+};
+
 // The fixed types are basic types whose values have a fixed length,
 // namely BYTE, BOOLEAN, DOUBLE, UNIX_FD, and signed or unsigned integers of length 16, 32 or 64 bits.
 template <typename type_t>

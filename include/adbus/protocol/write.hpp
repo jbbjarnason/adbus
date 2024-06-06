@@ -7,6 +7,7 @@
 #include <glaze/concepts/container_concepts.hpp>
 
 #include <adbus/core/context.hpp>
+#include <adbus/util/concepts.hpp>
 
 namespace adbus::protocol {
 
@@ -54,6 +55,13 @@ struct write;
  *
  * As an exception to natural alignment, STRUCT and DICT_ENTRY values are always aligned to an 8-byte boundary, regardless of the alignments of their contents.
 */
+
+constexpr void resize(auto&& buffer, auto&& idx, auto&& n) noexcept {
+  if (idx + n > buffer.size()) [[unlikely]] {
+    buffer.resize((std::max)(buffer.size() * 2, idx + n));
+  }
+}
+
 template <typename T>
 concept trivially_copyable = std::is_trivially_copyable_v<std::decay_t<T>>;
 
@@ -61,9 +69,7 @@ constexpr void dbus_marshall(trivially_copyable auto&& value,[[maybe_unused]] is
   using V = std::decay_t<decltype(value)>;
   constexpr auto n = sizeof(V);
   if constexpr (glz::resizable<std::decay_t<decltype(buffer)>>) {
-    if (idx + n > buffer.size()) [[unlikely]] {
-      buffer.resize((std::max)(buffer.size() * 2, idx + n));
-    }
+    resize(buffer, idx, n);
   }
   else {
     if (idx + n > buffer.size()) [[unlikely]] {
@@ -84,9 +90,38 @@ constexpr void dbus_marshall(trivially_copyable auto&& value,[[maybe_unused]] is
   idx += n;
 }
 
+template <typename T>
+struct padding : std::false_type {};
+
+template <glz::detail::num_t T>
+struct padding<T> {
+  static constexpr std::size_t value{ sizeof(T) };
+};
+
+template <glz::detail::string_like T>
+struct padding<T> {
+  static constexpr std::size_t value{ sizeof(std::uint32_t) };
+};
+
+template <concepts::type::is_signature T>
+struct padding<T> {
+  static constexpr std::size_t value{ sizeof(std::uint8_t) };
+};
+
+//
+// template <typename T>
+// constexpr void padding(auto&& buffer, auto&& idx) noexcept {
+//   constexpr auto alignment = 8;
+//   const auto padding = (alignment - (idx % alignment)) % alignment;
+//   if (idx + padding > buffer.size()) [[unlikely]] {
+//     buffer.resize((std::max)(buffer.size() * 2, idx + padding));
+//   }
+//   std::memset(buffer.data() + idx, 0, padding);
+// }
+
 
 template <typename type_t>
-struct to_dbus_binary;
+struct to_dbus_binary : std::false_type {};
 
 template <>
 struct to_dbus_binary<bool>
@@ -119,12 +154,44 @@ struct to_dbus_binary<string_t> {
     const auto n{ static_cast<std::uint32_t>(value.size()) };
     dbus_marshall(n, ctx, buffer, idx);
     // +1 for the null terminator
-    if (idx + n + 1 > buffer.size()) [[unlikely]] {
+    resize(buffer, idx, n + 1);
+    std::memcpy(buffer.data() + idx, value.data(), n);
+    idx += n;
+    buffer[idx++] = '\0';
+  }
+};
+
+template <concepts::type::is_signature sign_t>
+struct to_dbus_binary<sign_t> {
+  template <options Opts>
+  static constexpr void op(auto&& value,[[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
+    const auto n{ static_cast<std::uint8_t>(value.size()) };
+    dbus_marshall(n, ctx, buffer, idx);
+    resize(buffer, idx, n + 1);
+    std::memcpy(buffer.data() + idx, value.data(), n);
+    idx += n;
+    buffer[idx++] = '\0';
+  }
+};
+
+// example: std::vector<std::uint64_t>{ 10, 20, 30 };
+// little endian
+// | Length (UINT32) | Padding     | Element 1 (UINT64)        | Element 2 (UINT64)        | Element 3 (UINT64)        |
+// |    4 bytes      | 4 bytes     |      8 bytes              |      8 bytes              |      8 bytes              |
+// |  18 00 00 00    | 00 00 00 00 | 0A 00 00 00 00 00 00 00   | 14 00 00 00 00 00 00 00   | 1E 00 00 00 00 00 00 00   |
+// |      24         |      0      |          10               |          20               |            30             |
+template <glz::detail::vector_like vector_t>
+  requires (!glz::detail::string_like<vector_t>)
+struct to_dbus_binary<vector_t> {
+  template <options Opts>
+  static constexpr void op(auto&& value,[[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
+    const auto n{ static_cast<std::uint32_t>(value.size()) };
+    dbus_marshall(n, ctx, buffer, idx);
+    if (idx + n > buffer.size()) [[unlikely]] {
       buffer.resize((std::max)(buffer.size() * 2, idx + n));
     }
     std::memcpy(buffer.data() + idx, value.data(), n);
     idx += n;
-    buffer[idx++] = '\0';
   }
 };
 
@@ -133,7 +200,7 @@ struct to_dbus_binary<string_t> {
 constexpr auto write_dbus_binary(auto&& value, auto&& buffer) noexcept -> error
 {
   context ctx{};
-  std::size_t idx{ 0 };
+  std::size_t idx{ buffer.size() };
   detail::to_dbus_binary<std::decay_t<decltype(value)>>::template op<{}>(std::forward<decltype(value)>(value), ctx, buffer, idx);
   if constexpr (glz::resizable<std::decay_t<decltype(buffer)>>) {
     buffer.resize(idx);

@@ -2,9 +2,10 @@
 
 #include <cstdint>
 #include <expected>
-#include <string>
 #include <string_view>
 #include <variant>
+#include <array>
+#include <cassert>
 
 #include <glaze/core/common.hpp>
 #include <glaze/core/meta.hpp>
@@ -20,100 +21,103 @@ namespace adbus::protocol::type {
 
 using std::string_view_literals::operator""sv;
 
-template <typename T = void>
 struct signature {
-//   static constexpr auto impl() -> std::string_view {
-// #if __cpp_static_assert >= 202306L
-//     static_assert(glz::false_v<T>, util::join_v<util::chars<"No signature for given type: \"">, glz::name_v<T>, util::chars<"\"">>);
-// #else
-//     static_assert(glz::false_v<T>, "No signature for given type");
-// #endif
-//
-//     return "foo"sv;
-//   }
-//   static constexpr auto value{ "foo"sv };
+  constexpr explicit signature(std::string_view sv) noexcept {
+    assert(sv.size() <= 255 && "signature size must be less than 255");
+    size_ = sv.size();
+    std::copy(std::begin(sv), std::end(sv), std::begin(data_));
+  }
+  constexpr explicit operator std::string_view() const noexcept { return { data_.data(), size_ }; }
+  [[nodiscard]] constexpr auto size() const noexcept -> std::uint8_t { return size_; }
+  [[nodiscard]] constexpr auto data() const noexcept -> decltype(auto) { return data_.data(); }
+  static constexpr auto dbus_signature{ true }; // flag to indicate this is a dbus signature for concept
+  std::uint8_t size_{};
+  std::array<char, 255> data_{};
 };
 
+template <typename T = void>
+struct signature_meta : std::false_type {};
+
 template <typename type_t>
-static constexpr auto signature_v{ signature<type_t>::value };
+static constexpr auto signature_v{ signature_meta<type_t>::value };
 
 template <>
-struct signature<std::uint8_t> {
+struct signature_meta<std::uint8_t> {
   static constexpr auto value{ "y"sv };
 };
 
 template <>
-struct signature<bool> {
+struct signature_meta<bool> {
   static constexpr auto value{ "b"sv };
 };
 
 template <>
-struct signature<std::int16_t> {
+struct signature_meta<std::int16_t> {
   static constexpr auto value{ "n"sv };
 };
 
 template <>
-struct signature<std::uint16_t> {
+struct signature_meta<std::uint16_t> {
   static constexpr auto value{ "q"sv };
 };
 
 template <>
-struct signature<std::int32_t> {
+struct signature_meta<std::int32_t> {
   static constexpr auto value{ "i"sv };
 };
 
 template <>
-struct signature<std::uint32_t> {
+struct signature_meta<std::uint32_t> {
   static constexpr auto value{ "u"sv };
 };
 
 template <>
-struct signature<std::int64_t> {
+struct signature_meta<std::int64_t> {
   static constexpr auto value{ "x"sv };
 };
 
 template <>
-struct signature<std::uint64_t> {
+struct signature_meta<std::uint64_t> {
   static constexpr auto value{ "t"sv };
 };
 
 template <std::same_as<double> value_t>
-struct signature<value_t> {
+struct signature_meta<value_t> {
   static constexpr auto value{ "d"sv };
 };
 
 // unix_fd ?
 
 template <glz::detail::string_like type_t>
-struct signature<type_t> {
+struct signature_meta<type_t> {
   static constexpr auto value{ "s"sv };
 };
 
 template <>
-struct signature<path> {
+struct signature_meta<path> {
   static constexpr auto value{ "o"sv };
 };
 
 template <typename type_t>
 concept has_signature = requires {
-  signature<type_t>::value;
-  requires std::same_as<std::remove_const_t<decltype(signature<type_t>::value)>, std::string_view>;
+  signature_meta<type_t>::value;
+  requires std::same_as<std::remove_const_t<decltype(signature_meta<type_t>::value)>, std::string_view>;
 };
 
 template <has_signature type_t, has_signature... types_t>
-struct signature<std::variant<type_t, types_t...>> {
+struct signature_meta<std::variant<type_t, types_t...>> {
   static constexpr auto value{ "v"sv };
 };
 
 template <std::ranges::range type_t>
   requires has_signature<std::ranges::range_value_t<type_t>>
-struct signature<type_t> {
+struct signature_meta<type_t> {
   static constexpr auto value{ util::join_v<util::chars<"a">, signature_v<std::ranges::range_value_t<type_t>>> };
 };
 
 template <typename tuple_t>
   requires glz::is_std_tuple<tuple_t> // glz::detail::tuple_t<tuple_t> ||
-struct signature<tuple_t> {
+struct signature_meta<tuple_t> {
   template <typename type_t>
   struct join_impl;
   template <typename... types_t>
@@ -125,7 +129,7 @@ struct signature<tuple_t> {
 
 template <glz::detail::map_subscriptable dict_t>
   requires concepts::type::basic<typename dict_t::key_type>
-struct signature<dict_t> {
+struct signature_meta<dict_t> {
   static constexpr auto value{
     util::join_v<util::chars<"a{">, signature_v<typename dict_t::key_type>, signature_v<typename dict_t::mapped_type>, util::chars<"}">>
   };
@@ -145,7 +149,7 @@ static consteval bool assert_signature() {
 }
 
 template <glz::detail::reflectable T>
-struct signature<T> {
+struct signature_meta<T> {
   template <typename... Ts>
   static consteval std::string_view unwrap_tuple(std::tuple<Ts...>) noexcept {
     using util::chars;
@@ -159,7 +163,7 @@ struct signature<T> {
 };
 
 template <glz::detail::glaze_t T>
-struct signature<T> {
+struct signature_meta<T> {
   // Example of a glaze Object
   // glz::detail::Object<glz::tuplet::tuple<
   //   glz::tuplet::tuple<std::basic_string_view<char, std::char_traits<char> >, int my_struct3::*>,
@@ -221,7 +225,7 @@ concept enum_c = std::is_enum_v<T> && !glz::detail::glaze_enum_t<T>;
 
 // Todo make it optionally number or string
 template <enum_c T>
-struct signature<T> {
+struct signature_meta<T> {
   static constexpr auto value{ signature_v<std::underlying_type_t<T>> };
 };
 
