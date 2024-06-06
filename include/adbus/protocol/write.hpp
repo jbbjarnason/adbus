@@ -63,10 +63,38 @@ constexpr void resize(auto&& buffer, auto&& idx, auto&& n) noexcept {
 }
 
 template <typename T>
+struct padding : std::false_type {};
+
+template <glz::detail::num_t T>
+struct padding<T> {
+  static constexpr std::size_t value{ sizeof(T) };
+};
+
+template <glz::detail::string_like T>
+struct padding<T> {
+  static constexpr std::size_t value{ sizeof(std::uint32_t) };
+};
+
+template <concepts::type::is_signature T>
+struct padding<T> {
+  static constexpr std::size_t value{ sizeof(std::uint8_t) };
+};
+
+template <typename T>
+constexpr void pad(auto&& buffer, auto&& idx) noexcept {
+  constexpr auto alignment{ padding<T>::value };
+  const auto padding = (alignment - (idx % alignment)) % alignment;
+  resize(buffer, idx, padding);
+  std::memset(buffer.data() + idx, 0, padding);
+  idx += padding;
+}
+
+template <typename T>
 concept trivially_copyable = std::is_trivially_copyable_v<std::decay_t<T>>;
 
 constexpr void dbus_marshall(trivially_copyable auto&& value,[[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
   using V = std::decay_t<decltype(value)>;
+  pad<V>(buffer, idx);
   constexpr auto n = sizeof(V);
   if constexpr (glz::resizable<std::decay_t<decltype(buffer)>>) {
     resize(buffer, idx, n);
@@ -89,36 +117,6 @@ constexpr void dbus_marshall(trivially_copyable auto&& value,[[maybe_unused]] is
 
   idx += n;
 }
-
-template <typename T>
-struct padding : std::false_type {};
-
-template <glz::detail::num_t T>
-struct padding<T> {
-  static constexpr std::size_t value{ sizeof(T) };
-};
-
-template <glz::detail::string_like T>
-struct padding<T> {
-  static constexpr std::size_t value{ sizeof(std::uint32_t) };
-};
-
-template <concepts::type::is_signature T>
-struct padding<T> {
-  static constexpr std::size_t value{ sizeof(std::uint8_t) };
-};
-
-//
-// template <typename T>
-// constexpr void padding(auto&& buffer, auto&& idx) noexcept {
-//   constexpr auto alignment = 8;
-//   const auto padding = (alignment - (idx % alignment)) % alignment;
-//   if (idx + padding > buffer.size()) [[unlikely]] {
-//     buffer.resize((std::max)(buffer.size() * 2, idx + padding));
-//   }
-//   std::memset(buffer.data() + idx, 0, padding);
-// }
-
 
 template <typename type_t>
 struct to_dbus_binary : std::false_type {};
