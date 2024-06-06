@@ -77,8 +77,15 @@ int main() {
       + value.size() // The actual string length excluding any null terminator
       + 1 // The null terminator
       );
-    // auto compare = std::array<std::uint8_t, 4>{ static_cast<std::uint8_t>(value), 0x00, 0x00, 0x00 };
-    // expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare)));
+    // The expected buffer is the size of the string length + the string + the null terminator
+    auto compare = std::vector<std::uint8_t>{ static_cast<std::uint8_t>(value.size()), 0, 0, 0, 't','h','i','s',' ','i','s',' ','a',' ','m','e','s','s','a','g','e','\0' };
+    expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), [](auto&& a, auto&& b) {
+      auto foo =  static_cast<std::uint8_t>(a) == static_cast<std::uint8_t>(b);
+      if (!foo) {
+        fmt::print("a: {}, b: {}\n", a, b);
+      }
+      return foo;
+    }));
   } | std::tuple{ std::string{ "this is a message" }, std::string_view{ "this is a message" } };
 
 }
