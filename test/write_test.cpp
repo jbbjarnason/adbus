@@ -88,4 +88,14 @@ int main() {
     }));
   } | std::tuple{ std::string{ "this is a message" }, std::string_view{ "this is a message" } };
 
+  "string too long"_test = [] { // todo this is slow
+    std::string value{};
+    constexpr auto n{ static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()) + 10 };
+    value.resize(n);
+    std::fill_n(std::begin(value), n, 'a');
+    std::string buffer{};
+    auto err = write_dbus_binary(value, buffer);
+    expect(!!err);
+    expect(err.code == adbus::protocol::error_code::string_too_long);
+  };
 }

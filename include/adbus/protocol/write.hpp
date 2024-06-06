@@ -138,7 +138,7 @@ constexpr auto write_dbus_binary(auto&& value, auto&& buffer) noexcept -> error
   if constexpr (glz::resizable<std::decay_t<decltype(buffer)>>) {
     buffer.resize(idx);
   }
-  return error{.code = error_code::no_error};
+  return ctx.err;
 }
 
 template <typename buffer_t = std::string>
