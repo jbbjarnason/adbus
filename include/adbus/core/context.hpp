@@ -18,6 +18,7 @@ enum struct error_code : std::uint8_t {
   multiple_dots,
   // write errors
   buffer_too_small,
+  string_too_long,
 };
 
 struct error final {

@@ -108,6 +108,26 @@ struct to_dbus_binary<number_t>
   }
 };
 
+template <glz::detail::string_like string_t>
+struct to_dbus_binary<string_t> {
+  template <options Opts>
+  static constexpr void op(auto&& value,[[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
+    if (value.size() > std::numeric_limits<std::uint32_t>::max()) [[unlikely]] {
+      ctx.err = error{.code = error_code::string_too_long};
+      return;
+    }
+    const auto n{ static_cast<std::uint32_t>(value.size()) };
+    dbus_marshall(n, ctx, buffer, idx);
+    // +1 for the null terminator
+    if (idx + n + 1 > buffer.size()) [[unlikely]] {
+      buffer.resize((std::max)(buffer.size() * 2, idx + n));
+    }
+    std::memcpy(buffer.data() + idx, value.data(), n);
+    idx += n;
+    buffer[idx++] = '\0';
+  }
+};
+
 }  // namespace detail
 
 constexpr auto write_dbus_binary(auto&& value, auto&& buffer) noexcept -> error
