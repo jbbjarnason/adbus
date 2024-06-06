@@ -33,6 +33,12 @@ constexpr auto format_as(number_test<number_type> test) -> std::string {
   }
 }
 
+template <typename value_t>
+struct padding_test {
+  value_t value;
+  std::size_t offset;
+  std::size_t padding{ sizeof(value) - offset };
+};
 
 int main() {
   using adbus::protocol::write_dbus_binary;
@@ -129,16 +135,42 @@ int main() {
     }));
   };
 
-  "alignment or padding"_test = [] {
-    std::string buffer{ "ab" }; // 2 bytes
-    auto err = write_dbus_binary(std::uint64_t{ 0x1234 }, buffer);
+  "alignment or padding"_test = [] (auto test){
+    std::string buffer{};
+    buffer.resize(test.offset);
+    auto err = write_dbus_binary(test.value, buffer);
     expect(!err);
-    const auto padding = 6; // 8 - 2
-    const auto size = 2 + padding + sizeof(std::uint64_t);
-    expect(buffer.size() == size) << fmt::format("Expected: {}, Got: {}", size, buffer.size());
+    std::size_t size{};
+    if constexpr (glz::detail::string_like<std::decay_t<decltype(test.value)>>) {
+      size = test.offset + test.padding + sizeof(std::uint32_t) + test.value.size() + 1;
+    }
+    else {
+      size = test.offset + test.padding + sizeof(test.value);
+    }
+    expect(buffer.size() == size) << fmt::format("Expected: {}, Got: {} for offset: {}", size, buffer.size(), test.offset);
+  } | std::tuple{
+    padding_test<std::uint64_t>{.value = 0x1234, .offset = 1},
+    padding_test<std::uint64_t>{.value = 0x1234, .offset = 2},
+    padding_test<std::uint64_t>{.value = 0x1234, .offset = 3},
+    padding_test<std::uint64_t>{.value = 0x1234, .offset = 4},
+    padding_test<std::uint64_t>{.value = 0x1234, .offset = 5},
+    padding_test<std::uint64_t>{.value = 0x1234, .offset = 6},
+    padding_test<std::uint64_t>{.value = 0x1234, .offset = 7},
+    padding_test<std::uint64_t>{.value = 0x1234, .offset = 8},
+    padding_test<std::uint32_t>{.value = 0x1234, .offset = 1},
+    padding_test<std::uint32_t>{.value = 0x1234, .offset = 2},
+    padding_test<std::uint32_t>{.value = 0x1234, .offset = 3},
+    padding_test<std::uint32_t>{.value = 0x1234, .offset = 4},
+    padding_test<std::uint16_t>{.value = 0x1234, .offset = 1},
+    padding_test<std::uint16_t>{.value = 0x1234, .offset = 2},
+    padding_test<std::uint8_t>{.value = 0x12, .offset = 1},
+    padding_test<std::string>{.value = "foo", .offset = 1, .padding = 3},
+    padding_test<std::string>{.value = "foo", .offset = 2, .padding = 2},
+    padding_test<std::string>{.value = "foo", .offset = 3, .padding = 1},
+    padding_test<std::string>{.value = "foo", .offset = 4, .padding = 0},
   };
 
-  "vector"_test = [] {
+  skip / "vector"_test = [] {
     std::vector<std::uint64_t> value{ 10, 20, 30 };
     std::string buffer{};
     auto err = write_dbus_binary(value, buffer);

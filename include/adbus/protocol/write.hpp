@@ -83,6 +83,9 @@ struct padding<T> {
 template <typename T>
 constexpr void pad(auto&& buffer, auto&& idx) noexcept {
   constexpr auto alignment{ padding<T>::value };
+  // idx % alignment: This computes the offset of idx from the nearest previous alignment boundary.
+  // alignment - (idx % alignment): This calculates how much padding is needed to reach the next alignment boundary.
+  // (alignment - (idx % alignment)) % alignment: This ensures that if idx is already aligned (i.e., idx % alignment == 0), the padding is 0 instead of alignment.
   const auto padding = (alignment - (idx % alignment)) % alignment;
   resize(buffer, idx, padding);
   std::memset(buffer.data() + idx, 0, padding);
