@@ -135,6 +135,24 @@ int main() {
     }));
   };
 
+  "vector"_test = [] {
+    std::vector<std::uint64_t> value{ 10, 20, 30 };
+    std::string buffer{};
+    auto err = write_dbus_binary(value, buffer);
+    expect(!err);
+    const auto padding{ 4 }; // todo alignement of std::uint64_t - alignment of std::uint32_t
+    const auto size{ sizeof(std::uint32_t) + padding + value.size() * sizeof(std::uint64_t) };
+    expect(buffer.size() == size) << fmt::format("Expected: {}, Got: {}", size, buffer.size());
+    // auto compare = std::vector<std::uint8_t>{ static_cast<std::uint8_t>(value.size()), 0, 0, 0, 0x12, 0x34, 0x56, 0x78 };
+    // expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), [](auto&& a, auto&& b) {
+    // auto foo =  static_cast<std::uint8_t>(a) == static_cast<std::uint8_t>(b);
+    // if (!foo) {
+    // fmt::print("a: {}, b: {}\n", a, b);
+    // }
+    // return foo;
+    // }));
+  };
+
   "alignment or padding"_test = [] (auto test){
     std::string buffer{};
     buffer.resize(test.offset);
@@ -168,23 +186,5 @@ int main() {
     padding_test<std::string>{.value = "foo", .offset = 2, .padding = 2},
     padding_test<std::string>{.value = "foo", .offset = 3, .padding = 1},
     padding_test<std::string>{.value = "foo", .offset = 4, .padding = 0},
-  };
-
-  skip / "vector"_test = [] {
-    std::vector<std::uint64_t> value{ 10, 20, 30 };
-    std::string buffer{};
-    auto err = write_dbus_binary(value, buffer);
-    expect(!err);
-    const auto padding{ 4 }; // todo alignement of std::uint64_t - alignment of std::uint32_t
-    const auto size{ sizeof(std::uint32_t) + padding + value.size() * sizeof(std::uint64_t) };
-    expect(buffer.size() == size);
-    // auto compare = std::vector<std::uint8_t>{ static_cast<std::uint8_t>(value.size()), 0, 0, 0, 0x12, 0x34, 0x56, 0x78 };
-    // expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), [](auto&& a, auto&& b) {
-      // auto foo =  static_cast<std::uint8_t>(a) == static_cast<std::uint8_t>(b);
-      // if (!foo) {
-            // fmt::print("a: {}, b: {}\n", a, b);
-      // }
-      // return foo;
-    // }));
   };
 }

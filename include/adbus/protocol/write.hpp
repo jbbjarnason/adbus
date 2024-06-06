@@ -175,6 +175,36 @@ struct to_dbus_binary<sign_t> {
   }
 };
 
+constexpr auto string_size(glz::detail::string_like auto&& value) noexcept -> std::size_t {
+  return sizeof(std::uint32_t) + value.size() + 1;
+}
+
+template <glz::detail::string_like T>
+constexpr auto calculate_array_byte_size(T&& value) noexcept -> std::size_t {
+  return value.size() + 1; //
+}
+
+template <trivially_copyable T>
+constexpr calculate_array_byte_size(T&&) noexcept -> std::size_t {
+  return sizeof(T);
+}
+
+template <typename T>
+    requires glz::detail::vector_like<T> && glz::has_size<typename T::value_type>
+constexpr auto calculate_array_byte_size(T&& value) noexcept -> std::size_t {
+  std::size_t n{};
+  for (const auto& v : value) {
+    n += calculate_array_byte_size(v);
+  }
+}
+
+template <typename T>
+  requires glz::detail::vector_like<T> && trivially_copyable<typename T::value_type>
+constexpr auto calculate_array_byte_size(T&& value) noexcept -> std::size_t {
+  using value_type = typename std::decay_t<decltype(value)>::value_type;
+  return sizeof(value_type) * value.size();
+}
+
 // example: std::vector<std::uint64_t>{ 10, 20, 30 };
 // little endian
 // | Length (UINT32) | Padding     | Element 1 (UINT64)        | Element 2 (UINT64)        | Element 3 (UINT64)        |
@@ -188,9 +218,9 @@ struct to_dbus_binary<vector_t> {
   static constexpr void op(auto&& value,[[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
     const auto n{ static_cast<std::uint32_t>(value.size()) };
     dbus_marshall(n, ctx, buffer, idx);
-    if (idx + n > buffer.size()) [[unlikely]] {
-      buffer.resize((std::max)(buffer.size() * 2, idx + n));
-    }
+
+    if constexpr ()
+    resize()
     std::memcpy(buffer.data() + idx, value.data(), n);
     idx += n;
   }
