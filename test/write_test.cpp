@@ -14,6 +14,7 @@
 
 using namespace boost::ut;
 using std::string_view_literals::operator""sv;
+using std::string_literals::operator""s;
 
 template <glz::detail::num_t type>
 struct number_test {
@@ -44,6 +45,14 @@ struct padding_test {
   std::size_t padding{ sizeof(value) - offset };
 };
 
+constexpr auto uint8_cmp{ [](auto&& a, auto&& b) -> bool {
+  auto foo = static_cast<std::uint8_t>(a) == static_cast<std::uint8_t>(b);
+  if (!foo) {
+    fmt::print("a: {}, b: {}\n", static_cast<std::uint8_t>(a), static_cast<std::uint8_t>(b));
+  }
+  return foo;
+} };
+
 int main() {
   using adbus::protocol::write_dbus_binary;
 
@@ -53,13 +62,7 @@ int main() {
         auto err = write_dbus_binary(test.value, buffer);
         expect(!err);
         expect(buffer.size() == sizeof(test.value));
-        expect(std::equal(buffer.begin(), buffer.end(), test.expected.begin(), test.expected.end(), [](auto&& a, auto&& b) {
-          auto foo = static_cast<std::uint8_t>(a) == static_cast<std::uint8_t>(b);
-          if (!foo) {
-            fmt::print("a: {}, b: {}\n", a, b);
-          }
-          return foo;
-        })) << fmt::format("Got: {}, Expected: {}", fmt::join(to_hex_vector(test.expected), ", "), test);
+        expect(std::equal(buffer.begin(), buffer.end(), test.expected.begin(), test.expected.end(), uint8_cmp)) << fmt::format("Got: {}, Expected: {}", fmt::join(to_hex_vector(test.expected), ", "), test);
       } |
       std::tuple{
         number_test<std::uint8_t>{ .value = 0x12, .expected = { 0x12 } },
@@ -96,13 +99,7 @@ int main() {
     // clang-format off
     auto compare = std::vector<std::uint8_t>{ static_cast<std::uint8_t>(value.size()), 0, 0, 0, 't','h','i','s',' ','i','s',' ','a',' ','m','e','s','s','a','g','e','\0' };
     // clang-format on
-    expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), [](auto&& a, auto&& b) {
-      auto foo = static_cast<std::uint8_t>(a) == static_cast<std::uint8_t>(b);
-      if (!foo) {
-        fmt::print("a: {}, b: {}\n", a, b);
-      }
-      return foo;
-    }));
+    expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
   } | std::tuple{ std::string{ "this is a message" }, std::string_view{ "this is a message" } };
 
   "string too long"_test = [] {  // todo this is slow
@@ -137,15 +134,15 @@ int main() {
       signature.size(), '(', 't', 'a', '(', 's', 't', ')', 'a', '(', 's', 't', ')', 's', ')', '\0'
     };
 
-    expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), [](auto&& a, auto&& b) {
-      auto foo = static_cast<std::uint8_t>(a) == static_cast<std::uint8_t>(b);
-      if (!foo) {
-        fmt::print("a: {}, b: {}\n", a, b);
-      }
-      return foo;
-    }));
+    expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
   };
 
+  // example: std::vector<std::uint64_t>{ 10, 20, 30 };
+  // little endian
+  // | Length (UINT32) | Padding     | Element 1 (UINT64)        | Element 2 (UINT64)        | Element 3 (UINT64)        |
+  // |    4 bytes      | 4 bytes     |      8 bytes              |      8 bytes              |      8 bytes              |
+  // |  18 00 00 00    | 00 00 00 00 | 0A 00 00 00 00 00 00 00   | 14 00 00 00 00 00 00 00   | 1E 00 00 00 00 00 00 00   |
+  // |      24         |      0      |          10               |          20               |            30             |
   "vector trivial value_type"_test = [](auto&& value) {
     std::string buffer{};
     auto err = write_dbus_binary(value, buffer);
@@ -160,13 +157,7 @@ int main() {
       20, 0, 0, 0, 0, 0, 0, 0,  // 20
       30, 0, 0, 0, 0, 0, 0, 0,  // 30
     };
-    expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), [](auto&& a, auto&& b) {
-      auto foo = static_cast<std::uint8_t>(a) == static_cast<std::uint8_t>(b);
-      if (!foo) {
-        fmt::print("a: {}, b: {}\n", a, b);
-      }
-      return foo;
-    }));
+    expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
   } | std::tuple{
     std::vector{ 10UL, 20UL, 30UL },
     std::array{ 10UL, 20UL, 30UL },
@@ -177,21 +168,57 @@ int main() {
     std::unordered_set{ 30UL, 20UL, 10UL }, // inversion because orders differently than set
   };
 
-  "vector of strings"_test = [] {
-    std::vector<std::string> value{ "foo", "bar", "baz" };
+  "vector of strings"_test = [](auto&& value) {
     std::string buffer{};
     auto err = write_dbus_binary(value, buffer);
     expect(!err);
     const auto padding{ 0 };  // alignment of string is same as std::uint32_t
     const auto size{ sizeof(std::uint32_t) + padding + value.size() * 8 };
     expect(buffer.size() == size) << fmt::format("Expected: {}, Got: {}", size, buffer.size());
+    auto compare = std::vector<std::uint8_t>{
+      24, 0, 0, 0,              // size
+      // no padding
+      3,  0, 0, 0, 'b', 'a', 'r', '\0',  // bar
+      3,  0, 0, 0, 'b', 'a', 'z', '\0',  // baz
+      3,  0, 0, 0, 'f', 'o', 'o', '\0',  // foo
+    };
+    expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
+  } | std::tuple{
+    std::vector{ "bar"s, "baz"s, "foo"s },
+    std::array{ "bar"s, "baz"s, "foo"s },
+    std::deque{ "bar"s, "baz"s, "foo"s },
+    std::list{ "bar"s, "baz"s, "foo"s },
+    // std::forward_list{ "bar"s, "baz"s, "foo"s }, // todo does not have size member function
+    std::set{ "bar"s, "baz"s, "foo"s },
+    std::unordered_set{ "foo"s, "baz"s, "bar"s, }, // inversion because orders differently than set
   };
 
-  // | Array Length (UINT32) | Length 1 (UINT32) | String 1 (std::string)        | Length 2 (UINT32) | String 2 (std::string)        | Length 3 (UINT32) | String 3 (std::string)        |
-  // |        4 bytes        |      4 bytes      |       8 bytes (6+2)           |      4 bytes      |       8 bytes (6+2)           |      4 bytes      |       8 bytes (5+3)           |
-  // |     18 00 00 00       |    05 00 00 00    | 68 65 6C 6C 6F 00 00 00       |    05 00 00 00    | 77 6F 72 6C 64 00 00 00       |    04 00 00 00    | 64 62 75 73 00 00 00          |
-  // |         24            |         5         |  h  e  l  l  o \0 \0 \0       |         5         |  w  o  r  l  d \0 \0 \0       |         4         |  d  b  u  s \0 \0 \0          |
+  // Now let's try array of strings with padding inbetween
+  // | Array Length (UINT32) | Length 1 (UINT32) | String 1 (std::string)  | Length 2 (UINT32) | String 2 (std::string)  | Length 3 (UINT32) | String 3 (std::string)  |
+  // |        4 bytes        |      4 bytes      |       8 bytes (6+2)     |      4 bytes      |       8 bytes (5+3)     |      4 bytes      |       6 bytes (6)       |
+  // |     22 00 00 00       |    05 00 00 00    | 68 65 6C 6C 6F 00 00 00 |    04 00 00 00    | 64 62 75 73 00 00 00 00 |    05 00 00 00    | 77 6F 72 6C 64 00       |
+  // |         34            |         5         |  h  e  l  l  o \0 \0 \0 |         4         |  d  b  u  s \0 \0 \0 \0 |         5         |  w  o  r  l  d \0       |
+  "vector of strings with padding"_test = [](auto&& value) {
+    std::string buffer{};
+    auto err = write_dbus_binary(value, buffer);
+    expect(!err);
+    constexpr auto size{ 38 };
+    expect(buffer.size() == size) << fmt::format("Expected: {}, Got: {}", size, buffer.size());
+    auto compare = std::vector<std::uint8_t>{
+      34, 0, 0, 0,  // size
+      5, 0, 0, 0,  // length 1
+      'h', 'e', 'l', 'l', 'o', 0, 0, 0,  // string 1
+      4, 0, 0, 0,  // length 2
+      'd', 'b', 'u', 's', 0, 0, 0, 0,  // string 2
+      5, 0, 0, 0,  // length 3
+      'w', 'o', 'r', 'l', 'd', 0,  // string 3
+    };
+    expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
+  } | std::tuple{ std::vector{"hello"s, "dbus"s, "world"s} };
 
+
+  // Note that the alignment padding for the first element is required even if there is no first element (an empty array, where n is zero).
+  "Empty array"_test = [] {};
 
   "alignment or padding"_test =
       [](auto test) {

@@ -172,57 +172,27 @@ struct to_dbus_binary<sign_t> {
   }
 };
 
-template <string_like T>
-constexpr auto calculate_size_in_bytes(T&& value) noexcept -> std::size_t {
-  // sizeof(std::uint32_t) for the length
-  // + value.size() for the string
-  // + 1 for the null terminator
-  return sizeof(std::uint32_t) + value.size() + 1;
-}
-
-template <arithmetic T>
-constexpr auto calculate_size_in_bytes(T&&) noexcept -> std::size_t {
-  return sizeof(T);
-}
-
-template <single_element_container T>
-    requires has_size<typename std::decay_t<T>::value_type>
-constexpr auto calculate_size_in_bytes(T&& value) noexcept -> std::size_t {
-  std::size_t n{};
-  for (const auto& v : value) {
-    n += calculate_size_in_bytes(v);
-  }
-  return n;
-}
-
-template <single_element_container T>
-  requires arithmetic<typename std::decay_t<T>::value_type>
-constexpr auto calculate_size_in_bytes(T&& value) noexcept -> std::size_t {
-  using value_type = typename std::decay_t<T>::value_type;
-  return sizeof(value_type) * value.size();
-}
-
-// example: std::vector<std::uint64_t>{ 10, 20, 30 };
-// little endian
-// | Length (UINT32) | Padding     | Element 1 (UINT64)        | Element 2 (UINT64)        | Element 3 (UINT64)        |
-// |    4 bytes      | 4 bytes     |      8 bytes              |      8 bytes              |      8 bytes              |
-// |  18 00 00 00    | 00 00 00 00 | 0A 00 00 00 00 00 00 00   | 14 00 00 00 00 00 00 00   | 1E 00 00 00 00 00 00 00   |
-// |      24         |      0      |          10               |          20               |            30             |
 template <single_element_container iterable_t>
 struct to_dbus_binary<iterable_t> {
+  // Arrays are marshalled as a UINT32 n giving the length of the array data in bytes
+  // n does not include the padding after the length, or any padding after the last element. i.e. n should be divisible by the number of elements in the array
   template <options Opts>
   static constexpr void op(auto&& value,[[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
-    const auto bytes{ calculate_size_in_bytes(value) };
+    std::uint32_t size_placeholder{};
+    const auto placeholder_idx{ idx };
+    dbus_marshall(size_placeholder, ctx, buffer, idx);
+    pad<typename std::decay_t<decltype(value)>::value_type>(buffer, idx); // n does not include the padding after the length
+    const auto beginning_of_data_idx{ idx };
+    for (const auto& v : value) {
+      to_dbus_binary<std::decay_t<decltype(v)>>::template op<Opts>(v, ctx, buffer, idx);
+    }
+    const auto bytes{ idx - beginning_of_data_idx };
     if (bytes > std::numeric_limits<std::uint32_t>::max()) [[unlikely]] {
       ctx.err = error{.code = error_code::array_too_long};
       return;
     }
-    dbus_marshall(static_cast<std::uint32_t>(bytes), ctx, buffer, idx);
-    // since we have calculated the bytes needed, let's resize accordingly
-    resize(buffer, idx, bytes);
-    for (const auto& v : value) {
-      to_dbus_binary<std::decay_t<decltype(v)>>::template op<Opts>(v, ctx, buffer, idx);
-    }
+    const auto n{ static_cast<std::uint32_t>(bytes) };
+    std::memcpy(buffer.data() + placeholder_idx, &n, sizeof(n));
   }
 };
 
