@@ -2,8 +2,12 @@
 #include <tuple>
 
 #include <fmt/format.h>
+
 #include <boost/ut.hpp>
+#include <forward_list>
 #include <glaze/glaze.hpp>
+#include <set>
+#include <unordered_set>
 
 #include <adbus/protocol/signature.hpp>
 #include <adbus/protocol/write.hpp>
@@ -163,7 +167,15 @@ int main() {
       }
       return foo;
     }));
-  } | std::tuple{ std::vector{ 10UL, 20UL, 30UL }, std::array{ 10UL, 20UL, 30UL }, std::deque{ 10UL, 20UL, 30UL }, std::list{ 10UL, 20UL, 30UL } };
+  } | std::tuple{
+    std::vector{ 10UL, 20UL, 30UL },
+    std::array{ 10UL, 20UL, 30UL },
+    std::deque{ 10UL, 20UL, 30UL },
+    std::list{ 10UL, 20UL, 30UL },
+    // std::forward_list{ 10UL, 20UL, 30UL }, // todo does not have size member function
+    std::set{ 10UL, 20UL, 30UL },
+    std::unordered_set{ 30UL, 20UL, 10UL }, // inversion because orders differently than set
+  };
 
   "vector of strings"_test = [] {
     std::vector<std::string> value{ "foo", "bar", "baz" };

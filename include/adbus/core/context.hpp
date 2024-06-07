@@ -19,6 +19,7 @@ enum struct error_code : std::uint8_t {
   // write errors
   buffer_too_small,
   string_too_long,
+  array_too_long,
 };
 
 struct error final {

@@ -213,7 +213,11 @@ struct to_dbus_binary<iterable_t> {
   template <options Opts>
   static constexpr void op(auto&& value,[[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
     const auto bytes{ calculate_size_in_bytes(value) };
-    dbus_marshall(bytes, ctx, buffer, idx);
+    if (bytes > std::numeric_limits<std::uint32_t>::max()) [[unlikely]] {
+      ctx.err = error{.code = error_code::array_too_long};
+      return;
+    }
+    dbus_marshall(static_cast<std::uint32_t>(bytes), ctx, buffer, idx);
     // since we have calculated the bytes needed, let's resize accordingly
     resize(buffer, idx, bytes);
     for (const auto& v : value) {
