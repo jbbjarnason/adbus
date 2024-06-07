@@ -4,6 +4,7 @@
 #include <expected>
 #include <type_traits>
 
+#include <glaze/core/common.hpp>
 #include <glaze/concepts/container_concepts.hpp>
 
 #include <adbus/core/context.hpp>
@@ -193,6 +194,38 @@ struct to_dbus_binary<iterable_t> {
     }
     const auto n{ static_cast<std::uint32_t>(bytes) };
     std::memcpy(buffer.data() + placeholder_idx, &n, sizeof(n));
+  }
+};
+
+template <typename T>
+  requires(glz::detail::glaze_object_t<T> || glz::detail::reflectable<T>)
+struct to_dbus_binary<T> {
+  static constexpr auto N = glz::reflection_count<T>;
+
+  // mostly copied from glaze binary/write.hpp
+  template <options Opts>
+  static constexpr void op(auto&& value, auto&&... args) noexcept {
+    decltype(auto) t = glz::detail::reflection_tuple<T>(value);
+    glz::for_each<N>([&](auto I) {
+      using Element = glz::detail::glaze_tuple_element<I, N, T>;
+      static constexpr size_t member_index = Element::member_index;
+      using val_t = std::remove_cvref_t<typename Element::type>;
+      if constexpr (std::same_as<val_t, glz::hidden> || std::same_as<val_t, glz::skip>) {
+         return;
+      }
+      else {
+        decltype(auto) member = [&]() -> decltype(auto) {
+           if constexpr (glz::detail::reflectable<T>) {
+              return std::get<I>(t);
+           }
+           else {
+              return get<member_index>(get<I>(glz::meta_v<std::decay_t<T>>));
+           }
+        }();
+        auto& member_ref = glz::detail::get_member(value, member);
+        to_dbus_binary<std::decay_t<decltype(member_ref)>>::template op<Opts>(member_ref, args...);
+      }
+    });
   }
 };
 

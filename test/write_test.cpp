@@ -53,6 +53,17 @@ constexpr auto uint8_cmp{ [](auto&& a, auto&& b) -> bool {
   return foo;
 } };
 
+struct foo {
+  struct bar {
+    std::string a{};
+    std::uint64_t b{};
+  };
+  std::uint64_t a{};
+  std::vector<bar> bars{};
+  std::vector<bar> bars2{};
+  std::string b{};
+};
+
 int main() {
   using adbus::protocol::write_dbus_binary;
 
@@ -114,16 +125,6 @@ int main() {
 
   "signature"_test = [] {
     static_assert(adbus::type::is_signature<adbus::protocol::type::signature>);
-    struct foo {
-      struct bar {
-        std::string a{};
-        std::uint64_t b{};
-      };
-      std::uint64_t a{};
-      std::vector<bar> bars{};
-      std::vector<bar> bars2{};
-      std::string b{};
-    };
     adbus::protocol::type::signature signature{ adbus::protocol::type::signature_v<foo> };
     expect(std::string_view{ signature } == "(ta(st)a(st)s)"sv);
     std::string buffer{};
@@ -170,7 +171,6 @@ int main() {
 
   // Note that the alignment padding for the first element is required even if there is no first element (an empty array, where n is zero).
   "Empty array"_test = [] {
-    std::vector<std::uint64_t>{};
     std::string buffer{};
     auto err = write_dbus_binary(std::vector<std::uint64_t>{}, buffer);
     expect(!err);
@@ -231,6 +231,72 @@ int main() {
     };
     expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
   } | std::tuple{ std::vector{"hello"s, "dbus"s, "world"s} };
+
+  "struct"_test = [] {
+    struct simple {
+      std::uint8_t a{ 42 };
+      std::string b{ "dbus" };
+      double c{ 1337.42 };
+    };
+    std::string buffer{};
+    auto err = write_dbus_binary(simple{}, buffer);
+    expect(!err);
+    auto compare = std::vector<std::uint8_t>{
+      42,  // a
+      0, 0, 0,  // padding
+      4, 0, 0, 0, 'd', 'b', 'u', 's', 0,  // b
+      0, 0, 0, // padding
+      0x48, 0xe1, 0x7a, 0x14, 0xae, 0xe5, 0x94, 0x40,  // c
+    };
+    expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
+    expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
+  };
+
+  // "more complex struct"_test = [] {
+  //   foo test_foo {
+  //     .a = 12345,
+  //     .bars = { {"example1", 67890}, {"example2", 13579} },
+  //     .bars2 = { {"example3", 24680} },
+  //     .b = "end"
+  //   };
+  //
+  //   std::string buffer{};
+  //   auto err = write_dbus_binary(test_foo, buffer);
+  //   expect(!err);
+  //
+  //   auto compare = std::vector<std::uint8_t>{
+  //     // a
+  //     0x39, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 12345 (little-endian)
+  //
+  //     // bars - vector size
+  //     2, 0, 0, 0,  // number of elements in vector
+  //
+  //     // bars[0] - {"example1", 67890}
+  //     8, 0, 0, 0,  // string length
+  //     'e', 'x', 'a', 'm', 'p', 'l', 'e', '1', 0,  // string content + null terminator
+  //     0xd2, 0x1a, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  // 67890 (little-endian)
+  //
+  //     // bars[1] - {"example2", 13579}
+  //     8, 0, 0, 0,  // string length
+  //     'e', 'x', 'a', 'm', 'p', 'l', 'e', '2', 0,  // string content + null terminator
+  //     0x5b, 0x35, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 13579 (little-endian)
+  //
+  //     // bars2 - vector size
+  //     1, 0, 0, 0,  // number of elements in vector
+  //
+  //     // bars2[0] - {"example3", 24680}
+  //     8, 0, 0, 0,  // string length
+  //     'e', 'x', 'a', 'm', 'p', 'l', 'e', '3', 0,  // string content + null terminator
+  //     0x18, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 24680 (little-endian)
+  //
+  //     // b - "end"
+  //     3, 0, 0, 0,  // string length
+  //     'e', 'n', 'd', 0  // string content + null terminator
+  // };
+  //
+  //   expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
+  //   expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
+  // };
 
   "alignment or padding"_test =
       [](auto test) {
