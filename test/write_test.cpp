@@ -252,41 +252,41 @@ int main() {
     expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
   };
 
-  // "vector of struct"_test = [] {
-  //   // Create a vector of foo::bar instances
-  //   std::vector<foo::bar> bars{
-  //       {"example1", 67890},
-  //       {"example2", 13579},
-  //       {"example3", 24680}
-  //   };
-  //
-  //   std::string buffer{};
-  //   auto err = write_dbus_binary(bars, buffer);
-  //   expect(!err);
-  //
-  //   auto compare = std::vector<std::uint8_t>{
-  //     // Vector size
-  //     3, 0, 0, 0,  // number of elements in vector (little-endian)
-  //
-  //     // bars[0] - {"example1", 67890}
-  //     8, 0, 0, 0,  // string length
-  //     'e', 'x', 'a', 'm', 'p', 'l', 'e', '1', 0, 0, 0, 0, // string content + null terminator + padding
-  //     0xd2, 0x1a, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  // 67890 (little-endian)
-  //
-  //     // bars[1] - {"example2", 13579}
-  //     8, 0, 0, 0,  // string length
-  //     'e', 'x', 'a', 'm', 'p', 'l', 'e', '2', 0, 0, 0, 0, // string content + null terminator + padding
-  //     0x5b, 0x35, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 13579 (little-endian)
-  //
-  //     // bars[2] - {"example3", 24680}
-  //     8, 0, 0, 0,  // string length
-  //     'e', 'x', 'a', 'm', 'p', 'l', 'e', '3', 0, 0, 0, 0, // string content + null terminator + padding
-  //     0x18, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 24680 (little-endian)
-  // };
-  //
-  //   expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
-  //   expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
-  // };
+  "vector of struct"_test = [] {
+    // Create a vector of foo::bar instances
+    std::vector<foo::bar> bars{
+        {"example1", 67890},
+        {"example2", 13579},
+        {"example3", 24680}
+    };
+
+    std::string buffer{};
+    auto err = write_dbus_binary(bars, buffer);
+    expect(!err);
+
+    auto compare = std::vector<std::uint8_t>{
+      // Vector size
+      3, 0, 0, 0,  // number of elements in vector (little-endian)
+
+      // bars[0] - {"example1", 67890}
+      8, 0, 0, 0,  // string length
+      'e', 'x', 'a', 'm', 'p', 'l', 'e', '1', 0, 0, 0, 0, // string content + null terminator + padding
+      0xd2, 0x1a, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  // 67890 (little-endian)
+
+      // bars[1] - {"example2", 13579}
+      8, 0, 0, 0,  // string length
+      'e', 'x', 'a', 'm', 'p', 'l', 'e', '2', 0, 0, 0, 0, // string content + null terminator + padding
+      0x5b, 0x35, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 13579 (little-endian)
+
+      // bars[2] - {"example3", 24680}
+      8, 0, 0, 0,  // string length
+      'e', 'x', 'a', 'm', 'p', 'l', 'e', '3', 0, 0, 0, 0, // string content + null terminator + padding
+      0x18, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 24680 (little-endian)
+  };
+
+    expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
+    expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
+  };
 
   // "more complex struct"_test = [] {
   //   foo test_foo {
