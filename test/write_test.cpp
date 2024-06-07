@@ -112,7 +112,7 @@ int main() {
   };
 
   "signature"_test = [] {
-    static_assert(adbus::concepts::type::is_signature<adbus::protocol::type::signature>);
+    static_assert(adbus::type::is_signature<adbus::protocol::type::signature>);
     struct foo {
       struct bar {
         std::string a{};
@@ -142,8 +142,7 @@ int main() {
     }));
   };
 
-  "vector trivial value_type"_test = [] {
-    std::vector<std::uint64_t> value{ 10, 20, 30 };
+  "vector trivial value_type"_test = [](auto&& value) {
     std::string buffer{};
     auto err = write_dbus_binary(value, buffer);
     expect(!err);
@@ -164,7 +163,7 @@ int main() {
       }
       return foo;
     }));
-  };
+  } | std::tuple{ std::vector{ 10UL, 20UL, 30UL }, std::array{ 10UL, 20UL, 30UL }, std::deque{ 10UL, 20UL, 30UL }, std::list{ 10UL, 20UL, 30UL } };
 
   "vector of strings"_test = [] {
     std::vector<std::string> value{ "foo", "bar", "baz" };

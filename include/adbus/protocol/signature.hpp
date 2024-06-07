@@ -128,7 +128,7 @@ struct signature_meta<tuple_t> {
 };
 
 template <glz::detail::map_subscriptable dict_t>
-  requires concepts::type::basic<typename dict_t::key_type>
+  requires adbus::type::basic<typename dict_t::key_type>
 struct signature_meta<dict_t> {
   static constexpr auto value{
     util::join_v<util::chars<"a{">, signature_v<typename dict_t::key_type>, signature_v<typename dict_t::mapped_type>, util::chars<"}">>

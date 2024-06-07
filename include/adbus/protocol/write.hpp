@@ -75,7 +75,7 @@ struct padding<T> {
   static constexpr std::size_t value{ sizeof(std::uint32_t) };
 };
 
-template <concepts::type::is_signature T>
+template <adbus::type::is_signature T>
 struct padding<T> {
   static constexpr std::size_t value{ sizeof(std::uint8_t) };
 };
@@ -92,10 +92,7 @@ constexpr void pad(auto&& buffer, auto&& idx) noexcept {
   idx += padding;
 }
 
-template <typename T>
-concept trivially_copyable = std::is_trivially_copyable_v<std::decay_t<T>>;
-
-constexpr void dbus_marshall(trivially_copyable auto&& value,[[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
+constexpr void dbus_marshall(arithmetic auto&& value,[[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
   using V = std::decay_t<decltype(value)>;
   pad<V>(buffer, idx);
   constexpr auto n = sizeof(V);
@@ -162,7 +159,7 @@ struct to_dbus_binary<string_t> {
   }
 };
 
-template <concepts::type::is_signature sign_t>
+template <adbus::type::is_signature sign_t>
 struct to_dbus_binary<sign_t> {
   template <options Opts>
   static constexpr void op(auto&& value,[[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
@@ -175,7 +172,7 @@ struct to_dbus_binary<sign_t> {
   }
 };
 
-template <glz::detail::string_like T>
+template <string_like T>
 constexpr auto calculate_size_in_bytes(T&& value) noexcept -> std::size_t {
   // sizeof(std::uint32_t) for the length
   // + value.size() for the string
@@ -183,13 +180,13 @@ constexpr auto calculate_size_in_bytes(T&& value) noexcept -> std::size_t {
   return sizeof(std::uint32_t) + value.size() + 1;
 }
 
-template <trivially_copyable T>
+template <arithmetic T>
 constexpr auto calculate_size_in_bytes(T&&) noexcept -> std::size_t {
   return sizeof(T);
 }
 
-template <typename T>
-    requires glz::detail::vector_like<std::decay_t<T>> && glz::has_size<typename std::decay_t<T>::value_type>
+template <single_element_container T>
+    requires has_size<typename std::decay_t<T>::value_type>
 constexpr auto calculate_size_in_bytes(T&& value) noexcept -> std::size_t {
   std::size_t n{};
   for (const auto& v : value) {
@@ -198,8 +195,8 @@ constexpr auto calculate_size_in_bytes(T&& value) noexcept -> std::size_t {
   return n;
 }
 
-template <typename T>
-  requires (glz::detail::vector_like<std::decay_t<T>> && trivially_copyable<typename std::decay_t<T>::value_type> && !glz::detail::string_like<std::decay_t<T>>)
+template <single_element_container T>
+  requires arithmetic<typename std::decay_t<T>::value_type>
 constexpr auto calculate_size_in_bytes(T&& value) noexcept -> std::size_t {
   using value_type = typename std::decay_t<T>::value_type;
   return sizeof(value_type) * value.size();
@@ -211,9 +208,8 @@ constexpr auto calculate_size_in_bytes(T&& value) noexcept -> std::size_t {
 // |    4 bytes      | 4 bytes     |      8 bytes              |      8 bytes              |      8 bytes              |
 // |  18 00 00 00    | 00 00 00 00 | 0A 00 00 00 00 00 00 00   | 14 00 00 00 00 00 00 00   | 1E 00 00 00 00 00 00 00   |
 // |      24         |      0      |          10               |          20               |            30             |
-template <glz::detail::vector_like vector_t>
-  requires (!glz::detail::string_like<vector_t>)
-struct to_dbus_binary<vector_t> {
+template <single_element_container iterable_t>
+struct to_dbus_binary<iterable_t> {
   template <options Opts>
   static constexpr void op(auto&& value,[[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
     const auto bytes{ calculate_size_in_bytes(value) };

@@ -5,7 +5,37 @@
 
 #include <glaze/concepts/container_concepts.hpp>
 
-namespace adbus::concepts {
+namespace adbus {
+
+namespace detail {
+
+template <typename T>
+concept fixed_size = requires {
+  { std::tuple_size_v<T> } -> std::convertible_to<std::size_t>;
+};
+
+}  // namespace detail
+
+template <typename T>
+concept arithmetic = std::is_arithmetic_v<std::decay_t<T>>;
+
+template <typename T>
+concept has_size = glz::has_size<T>;
+
+template <typename T>
+concept string_like = glz::detail::string_like<T>;
+
+template <typename T>
+concept vector_like = glz::detail::vector_like<T> && !string_like<T>;
+
+template <typename T>
+concept map_like = glz::detail::map_subscriptable<T>;
+
+template <typename T>
+concept array_like = detail::fixed_size<T> && glz::detail::accessible<T> && glz::has_data<T> && !string_like<T>;
+
+template <typename T>
+concept single_element_container = glz::range<T> && !map_like<T> && !string_like<T>;
 
 namespace type {
 
@@ -50,4 +80,4 @@ concept basic = fixed<type_t> || glz::detail::string_like<type_t>;
 
 }  // namespace type
 
-}  // namespace adbus::concepts
+}  // namespace adbus
