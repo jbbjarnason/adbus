@@ -82,6 +82,11 @@ struct padding<T> {
 };
 
 template <typename T>
+concept has_padding = requires {
+  { padding<T>::value } -> std::same_as<std::size_t>;
+};
+
+template <has_padding T>
 constexpr void pad(auto&& buffer, auto&& idx) noexcept {
   constexpr auto alignment{ padding<T>::value };
   // idx % alignment: This computes the offset of idx from the nearest previous alignment boundary.
