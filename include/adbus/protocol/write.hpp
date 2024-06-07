@@ -175,33 +175,33 @@ struct to_dbus_binary<sign_t> {
   }
 };
 
-constexpr auto string_size(glz::detail::string_like auto&& value) noexcept -> std::size_t {
+template <glz::detail::string_like T>
+constexpr auto calculate_size_in_bytes(T&& value) noexcept -> std::size_t {
+  // sizeof(std::uint32_t) for the length
+  // + value.size() for the string
+  // + 1 for the null terminator
   return sizeof(std::uint32_t) + value.size() + 1;
 }
 
-template <glz::detail::string_like T>
-constexpr auto calculate_array_byte_size(T&& value) noexcept -> std::size_t {
-  return value.size() + 1; //
-}
-
 template <trivially_copyable T>
-constexpr calculate_array_byte_size(T&&) noexcept -> std::size_t {
+constexpr auto calculate_size_in_bytes(T&&) noexcept -> std::size_t {
   return sizeof(T);
 }
 
 template <typename T>
-    requires glz::detail::vector_like<T> && glz::has_size<typename T::value_type>
-constexpr auto calculate_array_byte_size(T&& value) noexcept -> std::size_t {
+    requires glz::detail::vector_like<std::decay_t<T>> && glz::has_size<typename std::decay_t<T>::value_type>
+constexpr auto calculate_size_in_bytes(T&& value) noexcept -> std::size_t {
   std::size_t n{};
   for (const auto& v : value) {
-    n += calculate_array_byte_size(v);
+    n += calculate_size_in_bytes(v);
   }
+  return n;
 }
 
 template <typename T>
-  requires glz::detail::vector_like<T> && trivially_copyable<typename T::value_type>
-constexpr auto calculate_array_byte_size(T&& value) noexcept -> std::size_t {
-  using value_type = typename std::decay_t<decltype(value)>::value_type;
+  requires glz::detail::vector_like<std::decay_t<T>> && trivially_copyable<typename std::decay_t<T>::value_type>
+constexpr auto calculate_size_in_bytes(T&& value) noexcept -> std::size_t {
+  using value_type = typename std::decay_t<T>::value_type;
   return sizeof(value_type) * value.size();
 }
 
@@ -216,13 +216,13 @@ template <glz::detail::vector_like vector_t>
 struct to_dbus_binary<vector_t> {
   template <options Opts>
   static constexpr void op(auto&& value,[[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
-    const auto n{ static_cast<std::uint32_t>(value.size()) };
-    dbus_marshall(n, ctx, buffer, idx);
-
-    if constexpr ()
-    resize()
-    std::memcpy(buffer.data() + idx, value.data(), n);
-    idx += n;
+    const auto bytes{ calculate_size_in_bytes(value) };
+    dbus_marshall(bytes, ctx, buffer, idx);
+    // since we have calculated the bytes needed, let's resize accordingly
+    resize(buffer, idx, bytes);
+    for (const auto& v : value) {
+      to_dbus_binary<std::decay_t<decltype(v)>>::template op<Opts>(v, ctx, buffer, idx);
+    }
   }
 };
 
