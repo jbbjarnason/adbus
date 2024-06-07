@@ -168,6 +168,22 @@ int main() {
     std::unordered_set{ 30UL, 20UL, 10UL }, // inversion because orders differently than set
   };
 
+  // Note that the alignment padding for the first element is required even if there is no first element (an empty array, where n is zero).
+  "Empty array"_test = [] {
+    std::vector<std::uint64_t>{};
+    std::string buffer{};
+    auto err = write_dbus_binary(std::vector<std::uint64_t>{}, buffer);
+    expect(!err);
+    const auto padding{ 4 };  // todo alignement of std::uint64_t - alignment of std::uint32_t
+    const auto size{ sizeof(std::uint32_t) + padding };
+    expect(buffer.size() == size) << fmt::format("Expected: {}, Got: {}", size, buffer.size());
+    auto compare = std::vector<std::uint8_t>{
+      0, 0, 0, 0,  // size
+      0, 0, 0, 0,  // padding
+    };
+    expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
+  };
+
   "vector of strings"_test = [](auto&& value) {
     std::string buffer{};
     auto err = write_dbus_binary(value, buffer);
@@ -215,10 +231,6 @@ int main() {
     };
     expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
   } | std::tuple{ std::vector{"hello"s, "dbus"s, "world"s} };
-
-
-  // Note that the alignment padding for the first element is required even if there is no first element (an empty array, where n is zero).
-  "Empty array"_test = [] {};
 
   "alignment or padding"_test =
       [](auto test) {
