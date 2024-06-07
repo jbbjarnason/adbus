@@ -199,7 +199,7 @@ constexpr auto calculate_size_in_bytes(T&& value) noexcept -> std::size_t {
 }
 
 template <typename T>
-  requires glz::detail::vector_like<std::decay_t<T>> && trivially_copyable<typename std::decay_t<T>::value_type>
+  requires (glz::detail::vector_like<std::decay_t<T>> && trivially_copyable<typename std::decay_t<T>::value_type> && !glz::detail::string_like<std::decay_t<T>>)
 constexpr auto calculate_size_in_bytes(T&& value) noexcept -> std::size_t {
   using value_type = typename std::decay_t<T>::value_type;
   return sizeof(value_type) * value.size();

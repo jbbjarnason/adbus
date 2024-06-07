@@ -142,7 +142,7 @@ int main() {
     }));
   };
 
-  "vector"_test = [] {
+  "vector trivial value_type"_test = [] {
     std::vector<std::uint64_t> value{ 10, 20, 30 };
     std::string buffer{};
     auto err = write_dbus_binary(value, buffer);
@@ -165,6 +165,22 @@ int main() {
       return foo;
     }));
   };
+
+  "vector of strings"_test = [] {
+    std::vector<std::string> value{ "foo", "bar", "baz" };
+    std::string buffer{};
+    auto err = write_dbus_binary(value, buffer);
+    expect(!err);
+    const auto padding{ 0 };  // alignment of string is same as std::uint32_t
+    const auto size{ sizeof(std::uint32_t) + padding + value.size() * 8 };
+    expect(buffer.size() == size) << fmt::format("Expected: {}, Got: {}", size, buffer.size());
+  };
+
+  // | Array Length (UINT32) | Length 1 (UINT32) | String 1 (std::string)        | Length 2 (UINT32) | String 2 (std::string)        | Length 3 (UINT32) | String 3 (std::string)        |
+  // |        4 bytes        |      4 bytes      |       8 bytes (6+2)           |      4 bytes      |       8 bytes (6+2)           |      4 bytes      |       8 bytes (5+3)           |
+  // |     18 00 00 00       |    05 00 00 00    | 68 65 6C 6C 6F 00 00 00       |    05 00 00 00    | 77 6F 72 6C 64 00 00 00       |    04 00 00 00    | 64 62 75 73 00 00 00          |
+  // |         24            |         5         |  h  e  l  l  o \0 \0 \0       |         5         |  w  o  r  l  d \0 \0 \0       |         4         |  d  b  u  s \0 \0 \0          |
+
 
   "alignment or padding"_test =
       [](auto test) {
