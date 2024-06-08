@@ -135,6 +135,8 @@ struct signature_meta<dict_t> {
   };
 };
 
+// todo std::pair how should it be represented?
+
 template<typename T>
 static consteval bool assert_signature() {
 #if __cpp_static_assert >= 202306L
