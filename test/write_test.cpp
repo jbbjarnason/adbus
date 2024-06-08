@@ -247,6 +247,32 @@ int main() {
     expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
   };
 
+  "Non-empty vector of vectors with padding"_test = [] {
+    std::string buffer{};
+    std::vector<std::vector<std::uint64_t>> vec = {
+      {1, 2},
+      {3, 4, 5}
+    };
+    auto err = write_dbus_binary(vec, buffer);
+    expect(!err);
+
+    // Correct comparison vector with padding
+    auto compare = std::vector<std::uint8_t>{
+      0x34, 0x00, 0x00, 0x00,  // Total length of outer array (52 bytes)
+      0x10, 0x00, 0x00, 0x00,  // Length of first inner array (16 bytes)
+      0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // First element of first inner array
+      0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // Second element of first inner array
+      0x18, 0x00, 0x00, 0x00,  // Length of second inner array (24 bytes)
+      0x00, 0x00, 0x00, 0x00,  // Padding to next multiple of 8 bytes
+      0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // First element of second inner array
+      0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // Second element of second inner array
+      0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00   // Third element of second inner array
+    };
+
+    expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
+    expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
+  };
+
   "struct"_test = [] {
     struct simple {
       std::uint8_t a{ 42 };
