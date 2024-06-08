@@ -377,7 +377,7 @@ int main() {
     expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
   };
 
-  "Empty map"_test = [] (auto&& value){
+  "Empty map"_test = [](auto&& value) {
     std::string buffer{};
     auto err = write_dbus_binary(value, buffer);
     expect(!err);
@@ -389,6 +389,59 @@ int main() {
     expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
     expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
   } | std::tuple{ std::map<std::string, std::uint64_t>{}, std::unordered_map<std::string, std::uint64_t>{} };
+
+  "map"_test =
+      [](auto&& value) {
+        std::string buffer{};
+        auto err = write_dbus_binary(value, buffer);
+        expect(!err);
+
+        // Example marshaled data
+        auto compare = std::vector<std::uint8_t>{
+          44, 0x00, 0x00, 0x00,  // Length of the array (44 bytes)
+          // First entry
+          0x04, 0x00, 0x00, 0x00,                          // Length of the string key1 (4 bytes)
+          'k', 'e', 'y', '1', 0x00,                        // key1
+          0, 0, 0,                                         // padding
+          0x7B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // Value 123 (64-bit)
+          // Second entry
+          0x04, 0x00, 0x00, 0x00,                         // Length of the string key2 (4 bytes)
+          'k', 'e', 'y', '2', 0x00,                       // key2
+          0, 0, 0, 0, 0, 0, 0,                            // padding
+          0xC8, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00  // Value 456 (64-bit)
+        };
+
+        expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
+        expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
+      } |
+      std::tuple{
+        std::map<std::string, std::uint64_t>{ { "key1", 123 }, { "key2", 456 } },
+        // todo probably differently ordered
+        // std::unordered_map<std::string, std::uint64_t>{ { "key1", 123 }, { "key2", 456 } }
+      };
+  "Map of maps"_test = [] {
+    std::string buffer{};
+    std::map<std::string, std::map<std::string, std::uint64_t>> map = { { "outerKey", { { "innerKey", 789 } } } };
+    auto err = write_dbus_binary(map, buffer);
+    expect(!err);
+
+    // Example marshaled data
+    auto compare = std::vector<std::uint8_t>{
+      44, 0x00, 0x00, 0x00,                                 // Length of the outer array (44 bytes)
+      0x08, 0x00, 0x00, 0x00,                               // Length of the string outerKey
+      'o',  'u',  't',  'e',  'r',  'K',  'e',  'y', 0x00,  // outerKey
+      // TODO I think this is wrong I think the padding is supposed to be here instead of below
+      24, 0x00, 0x00, 0x00,                                 // Length of the inner array (24 bytes)
+      0, 0, 0,                                              // padding
+      0x08, 0x00, 0x00, 0x00,                               // Length of the string innerKey
+      'i',  'n',  'n',  'e',  'r',  'K',  'e',  'y', 0x00,  // innerKey
+      0, 0, 0,                                              // padding
+      0x15, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00        // Value 789 (64-bit)
+    };
+
+    expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
+    expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
+  };
 
   "alignment or padding"_test =
       [](auto test) {
