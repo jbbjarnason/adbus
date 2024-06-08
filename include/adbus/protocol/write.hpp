@@ -4,8 +4,8 @@
 #include <expected>
 #include <type_traits>
 
-#include <glaze/core/common.hpp>
 #include <glaze/concepts/container_concepts.hpp>
+#include <glaze/core/common.hpp>
 
 #include <adbus/core/context.hpp>
 #include <adbus/util/concepts.hpp>
@@ -17,6 +17,7 @@ namespace detail {
 template <typename type_t>
 struct write;
 
+// clang-format off
 /**
  * Summary of D-Bus Marshalling
  *
@@ -56,6 +57,7 @@ struct write;
  *
  * As an exception to natural alignment, STRUCT and DICT_ENTRY values are always aligned to an 8-byte boundary, regardless of the alignments of their contents.
 */
+// clang-format on
 
 constexpr void resize(auto&& buffer, auto&& idx, auto&& n) noexcept {
   if (idx + n > buffer.size()) [[unlikely]] {
@@ -91,7 +93,7 @@ template <typename T>
 struct padding<T> {
   // I do not like the below, doing more reflection_count than needed
   static constexpr auto N = glz::reflection_count<T>;
-  using Element = glz::detail::glaze_tuple_element<0, N, T>; // first element
+  using Element = glz::detail::glaze_tuple_element<0, N, T>;  // first element
   using type = std::remove_cvref_t<typename Element::type>;
   static constexpr std::size_t value{ padding<type>::value };
 };
@@ -101,23 +103,26 @@ constexpr void pad(auto&& buffer, auto&& idx) noexcept {
   constexpr auto alignment{ padding<T>::value };
   // idx % alignment: This computes the offset of idx from the nearest previous alignment boundary.
   // alignment - (idx % alignment): This calculates how much padding is needed to reach the next alignment boundary.
-  // (alignment - (idx % alignment)) % alignment: This ensures that if idx is already aligned (i.e., idx % alignment == 0), the padding is 0 instead of alignment.
+  // (alignment - (idx % alignment)) % alignment: This ensures that if idx is already aligned (i.e., idx % alignment == 0),
+  // the padding is 0 instead of alignment.
   const auto padding = (alignment - (idx % alignment)) % alignment;
   resize(buffer, idx, padding);
   std::memset(buffer.data() + idx, 0, padding);
   idx += padding;
 }
 
-constexpr void dbus_marshall(arithmetic auto&& value,[[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
+constexpr void dbus_marshall(arithmetic auto&& value,
+                             [[maybe_unused]] is_context auto&& ctx,
+                             auto&& buffer,
+                             auto&& idx) noexcept {
   using V = std::decay_t<decltype(value)>;
   pad<V>(buffer, idx);
   constexpr auto n = sizeof(V);
   if constexpr (glz::resizable<std::decay_t<decltype(buffer)>>) {
     resize(buffer, idx, n);
-  }
-  else {
+  } else {
     if (idx + n > buffer.size()) [[unlikely]] {
-      ctx.err = error{.code = error_code::buffer_too_small};
+      ctx.err = error{ .code = error_code::buffer_too_small };
       return;
     }
   }
@@ -138,31 +143,29 @@ template <typename T>
 struct to_dbus_binary : std::false_type {};
 
 template <>
-struct to_dbus_binary<bool>
-{
+struct to_dbus_binary<bool> {
   template <options Opts>
-  static constexpr void op(auto&& value, is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept
-  {
-    dbus_marshall(static_cast<std::uint32_t>(value), std::forward<decltype(ctx)>(ctx), std::forward<decltype(buffer)>(buffer), std::forward<decltype(idx)>(idx));
+  static constexpr void op(auto&& value, is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
+    dbus_marshall(static_cast<std::uint32_t>(value), std::forward<decltype(ctx)>(ctx),
+                  std::forward<decltype(buffer)>(buffer), std::forward<decltype(idx)>(idx));
   }
 };
 
 template <glz::detail::num_t number_t>
-struct to_dbus_binary<number_t>
-{
+struct to_dbus_binary<number_t> {
   template <options Opts>
-  static constexpr void op(auto&& value,[[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept
-  {
-    dbus_marshall(std::forward<decltype(value)>(value), std::forward<decltype(ctx)>(ctx), std::forward<decltype(buffer)>(buffer), std::forward<decltype(idx)>(idx));
+  static constexpr void op(auto&& value, [[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
+    dbus_marshall(std::forward<decltype(value)>(value), std::forward<decltype(ctx)>(ctx),
+                  std::forward<decltype(buffer)>(buffer), std::forward<decltype(idx)>(idx));
   }
 };
 
 template <glz::detail::string_like string_t>
 struct to_dbus_binary<string_t> {
   template <options Opts>
-  static constexpr void op(auto&& value,[[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
+  static constexpr void op(auto&& value, [[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
     if (value.size() > std::numeric_limits<std::uint32_t>::max()) [[unlikely]] {
-      ctx.err = error{.code = error_code::string_too_long};
+      ctx.err = error{ .code = error_code::string_too_long };
       return;
     }
     const auto n{ static_cast<std::uint32_t>(value.size()) };
@@ -178,7 +181,7 @@ struct to_dbus_binary<string_t> {
 template <adbus::type::is_signature sign_t>
 struct to_dbus_binary<sign_t> {
   template <options Opts>
-  static constexpr void op(auto&& value,[[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
+  static constexpr void op(auto&& value, [[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
     const auto n{ static_cast<std::uint8_t>(value.size()) };
     dbus_marshall(n, ctx, buffer, idx);
     resize(buffer, idx, n + 1);
@@ -191,20 +194,21 @@ struct to_dbus_binary<sign_t> {
 template <single_element_container iterable_t>
 struct to_dbus_binary<iterable_t> {
   // Arrays are marshalled as a UINT32 n giving the length of the array data in bytes
-  // n does not include the padding after the length, or any padding after the last element. i.e. n should be divisible by the number of elements in the array
+  // n does not include the padding after the length, or any padding after the last element. i.e. n should be divisible by
+  // the number of elements in the array
   template <options Opts>
-  static constexpr void op(auto&& value,[[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
+  static constexpr void op(auto&& value, [[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
     std::uint32_t size_placeholder{};
     const auto placeholder_idx{ idx };
     dbus_marshall(size_placeholder, ctx, buffer, idx);
-    pad<typename std::decay_t<decltype(value)>::value_type>(buffer, idx); // n does not include the padding after the length
+    pad<typename std::decay_t<decltype(value)>::value_type>(buffer, idx);  // n does not include the padding after the length
     const auto beginning_of_data_idx{ idx };
     for (const auto& v : value) {
       to_dbus_binary<std::decay_t<decltype(v)>>::template op<Opts>(v, ctx, buffer, idx);
     }
     const auto bytes{ idx - beginning_of_data_idx };
     if (bytes > std::numeric_limits<std::uint32_t>::max()) [[unlikely]] {
-      ctx.err = error{.code = error_code::array_too_long};
+      ctx.err = error{ .code = error_code::array_too_long };
       return;
     }
     const auto n{ static_cast<std::uint32_t>(bytes) };
@@ -226,16 +230,14 @@ struct to_dbus_binary<T> {
       static constexpr size_t member_index = Element::member_index;
       using val_t = std::remove_cvref_t<typename Element::type>;
       if constexpr (std::same_as<val_t, glz::hidden> || std::same_as<val_t, glz::skip>) {
-         return;
-      }
-      else {
+        return;
+      } else {
         decltype(auto) member = [&]() -> decltype(auto) {
-           if constexpr (glz::detail::reflectable<T>) {
-              return std::get<I>(t);
-           }
-           else {
-              return get<member_index>(get<I>(glz::meta_v<std::decay_t<T>>));
-           }
+          if constexpr (glz::detail::reflectable<T>) {
+            return std::get<I>(t);
+          } else {
+            return get<member_index>(get<I>(glz::meta_v<std::decay_t<T>>));
+          }
         }();
         auto& member_ref = glz::detail::get_member(value, member);
         to_dbus_binary<std::decay_t<decltype(member_ref)>>::template op<Opts>(member_ref, args...);
@@ -246,11 +248,11 @@ struct to_dbus_binary<T> {
 
 }  // namespace detail
 
-constexpr auto write_dbus_binary(auto&& value, auto&& buffer) noexcept -> error
-{
+constexpr auto write_dbus_binary(auto&& value, auto&& buffer) noexcept -> error {
   context ctx{};
   std::size_t idx{ buffer.size() };
-  detail::to_dbus_binary<std::decay_t<decltype(value)>>::template op<{}>(std::forward<decltype(value)>(value), ctx, buffer, idx);
+  detail::to_dbus_binary<std::decay_t<decltype(value)>>::template op<{}>(std::forward<decltype(value)>(value), ctx, buffer,
+                                                                         idx);
   if constexpr (glz::resizable<std::decay_t<decltype(buffer)>>) {
     buffer.resize(idx);
   }
@@ -266,4 +268,4 @@ constexpr auto write_dbus_binary(auto&& value) noexcept -> std::expected<buffer_
   return buffer;
 }
 
-}
+}  // namespace adbus::protocol
