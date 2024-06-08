@@ -232,6 +232,21 @@ int main() {
     expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
   } | std::tuple{ std::vector{"hello"s, "dbus"s, "world"s} };
 
+  "Empty vector of vectors"_test = [] {
+    std::string buffer{};
+    auto err = write_dbus_binary(std::vector<std::vector<std::uint64_t>>{}, buffer);
+    expect(!err);
+    // TODO: IS THIS CORRECT ????????
+    auto compare = std::vector<std::uint8_t>{
+      0, 0, 0, 0,  // size outer
+      // no padding
+      // 0, 0, 0, 0,  // size inner
+      // 0, 0, 0, 0,  // padding
+    };
+    expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
+    expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
+  };
+
   "struct"_test = [] {
     struct simple {
       std::uint8_t a{ 42 };

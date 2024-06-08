@@ -81,6 +81,11 @@ struct padding<T> {
   static constexpr std::size_t value{ sizeof(std::uint8_t) };
 };
 
+template <single_element_container T>
+struct padding<T> {
+  static constexpr std::size_t value{ sizeof(std::uint32_t) };
+};
+
 template <typename T>
   requires(glz::detail::glaze_object_t<T> || glz::detail::reflectable<T>)
 struct padding<T> {
