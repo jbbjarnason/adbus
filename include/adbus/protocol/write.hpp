@@ -83,7 +83,7 @@ struct padding<T> {
   static constexpr std::size_t value{ sizeof(std::uint8_t) };
 };
 
-template <single_element_container T>
+template <container T>
 struct padding<T> {
   static constexpr std::size_t value{ sizeof(std::uint32_t) };
 };
@@ -96,6 +96,11 @@ struct padding<T> {
   using Element = glz::detail::glaze_tuple_element<0, N, T>;  // first element
   using type = std::remove_cvref_t<typename Element::type>;
   static constexpr std::size_t value{ padding<type>::value };
+};
+
+template <glz::detail::pair_t T>
+struct padding<T> {
+  static constexpr std::size_t value{ padding<typename T::first_type>::value };
 };
 
 template <typename T>
@@ -191,13 +196,25 @@ struct to_dbus_binary<sign_t> {
   }
 };
 
-template <single_element_container iterable_t>
-struct to_dbus_binary<iterable_t> {
+template <container T>
+struct to_dbus_binary<T> {
   // Arrays are marshalled as a UINT32 n giving the length of the array data in bytes
   // n does not include the padding after the length, or any padding after the last element. i.e. n should be divisible by
   // the number of elements in the array
   template <options Opts>
   static constexpr void op(auto&& value, [[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
+    if constexpr (map_like<T>) {
+      // the first single complete type (the "key") must be a basic type rather than a container type
+#if __cpp_static_assert >= 202306L
+      using glz::name_v;
+      using util::join_v;
+      using util::chars;
+      static_assert(adbus::type::basic<std::decay_t<typename T::key_type>>, join_v<chars<"The key type of the map-like type \"">, name_v<T>, chars<"\" must be a basic type as per dbus spec">>);
+#else
+      static_assert(adbus::type::basic<std::decay_t<typename T::key_type>>, "The key type of the map-like type must be a basic type as per dbus spec");
+#endif
+    }
+
     std::uint32_t size_placeholder{};
     const auto placeholder_idx{ idx };
     dbus_marshall(size_placeholder, ctx, buffer, idx);
@@ -213,6 +230,16 @@ struct to_dbus_binary<iterable_t> {
     }
     const auto n{ static_cast<std::uint32_t>(bytes) };
     std::memcpy(buffer.data() + placeholder_idx, &n, sizeof(n));
+  }
+};
+
+template <glz::detail::pair_t T>
+struct to_dbus_binary<T> {
+  template <options Opts>
+  static constexpr void op(auto&& pair, auto&&... args) noexcept {
+    const auto& [key, value]{ pair };
+    to_dbus_binary<typename T::first_type>::template op<Opts>(key, args...);
+    to_dbus_binary<typename T::second_type>::template op<Opts>(value, args...);
   }
 };
 

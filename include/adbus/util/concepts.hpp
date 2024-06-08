@@ -35,7 +35,7 @@ template <typename T>
 concept array_like = detail::fixed_size<T> && glz::detail::accessible<T> && glz::has_data<T> && !string_like<T>;
 
 template <typename T>
-concept single_element_container = glz::range<T> && !map_like<T> && !string_like<T>;
+concept container = glz::range<T> && !string_like<T>;
 
 namespace type {
 

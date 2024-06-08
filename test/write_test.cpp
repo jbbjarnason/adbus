@@ -377,6 +377,19 @@ int main() {
     expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
   };
 
+  "Empty map"_test = [] (auto&& value){
+    std::string buffer{};
+    auto err = write_dbus_binary(value, buffer);
+    expect(!err);
+
+    auto compare = std::vector<std::uint8_t>{
+      0x00, 0x00, 0x00, 0x00  // Length of the array (0 bytes)
+    };
+
+    expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
+    expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
+  } | std::tuple{ std::map<std::string, std::uint64_t>{}, std::unordered_map<std::string, std::uint64_t>{} };
+
   "alignment or padding"_test =
       [](auto test) {
         std::string buffer{};
