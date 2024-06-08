@@ -82,6 +82,16 @@ struct padding<T> {
 };
 
 template <typename T>
+  requires(glz::detail::glaze_object_t<T> || glz::detail::reflectable<T>)
+struct padding<T> {
+  // I do not like the below, doing more reflection_count than needed
+  static constexpr auto N = glz::reflection_count<T>;
+  using Element = glz::detail::glaze_tuple_element<0, N, T>; // first element
+  using type = std::remove_cvref_t<typename Element::type>;
+  static constexpr std::size_t value{ padding<type>::value };
+};
+
+template <typename T>
 constexpr void pad(auto&& buffer, auto&& idx) noexcept {
   constexpr auto alignment{ padding<T>::value };
   // idx % alignment: This computes the offset of idx from the nearest previous alignment boundary.
@@ -119,7 +129,7 @@ constexpr void dbus_marshall(arithmetic auto&& value,[[maybe_unused]] is_context
   idx += n;
 }
 
-template <typename type_t>
+template <typename T>
 struct to_dbus_binary : std::false_type {};
 
 template <>
