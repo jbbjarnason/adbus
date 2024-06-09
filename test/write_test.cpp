@@ -427,14 +427,14 @@ int main() {
 
     // Example marshaled data
     auto compare = std::vector<std::uint8_t>{
-      44, 0x00, 0x00, 0x00,                                 // Length of the outer array (44 bytes)
+      44,   0x00, 0x00, 0x00,                               // Length of the outer array (44 bytes)
       0x08, 0x00, 0x00, 0x00,                               // Length of the string outerKey
       'o',  'u',  't',  'e',  'r',  'K',  'e',  'y', 0x00,  // outerKey
-      0, 0, 0,                                              // padding
-      24, 0x00, 0x00, 0x00,                                 // Length of the inner array (24 bytes)
+      0,    0,    0,                                        // padding
+      24,   0x00, 0x00, 0x00,                               // Length of the inner array (24 bytes)
       0x08, 0x00, 0x00, 0x00,                               // Length of the string innerKey
       'i',  'n',  'n',  'e',  'r',  'K',  'e',  'y', 0x00,  // innerKey
-      0, 0, 0,                                              // padding
+      0,    0,    0,                                        // padding
       0x15, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00        // Value 789 (64-bit)
     };
 
@@ -442,21 +442,53 @@ int main() {
     expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
   };
 
-  "variant_string_test"_test = [] {
+  "variant string"_test = [] {
     using VariantType = std::variant<std::string, int, double>;
 
-    VariantType value = std::string{"variant"};
+    VariantType value = std::string{ "variant" };
     std::string buffer{};
     auto err = write_dbus_binary(value, buffer);
     expect(!err);
 
-    // Create the expected buffer manually
-    // Example marshaled data
     auto compare = std::vector<std::uint8_t>{
-      1, 's', 0,                              // length of signature + signature for string
-      0,                                      // padding
-      7, 0, 0, 0,                             // string length
-      'v', 'a', 'r', 'i', 'a', 'n', 't', 0    // string content + null terminator
+      1,   's', 0,                          // length of signature + signature for string
+      0,                                    // padding
+      7,   0,   0,   0,                     // string length
+      'v', 'a', 'r', 'i', 'a', 'n', 't', 0  // string content + null terminator
+    };
+    expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
+    expect(std::equal(buffer.begin(), buffer.end(), compare.begin(), compare.end(), uint8_cmp));
+  };
+
+  "variant int"_test = [] {
+    using VariantType = std::variant<std::string, std::int32_t, double>;
+
+    VariantType value = 123456;
+    std::string buffer{};
+    auto err = write_dbus_binary(value, buffer);
+    expect(!err);
+
+    auto compare = std::vector<std::uint8_t>{
+      1,  'i', 0,    // length of signature + signature for int
+      0,             // padding
+      64, 226, 1, 0  // int value (123456 in little-endian format)
+    };
+    expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
+    expect(std::equal(buffer.begin(), buffer.end(), compare.begin(), compare.end(), uint8_cmp));
+  };
+
+  "variant double test"_test = [] {
+    using VariantType = std::variant<std::string, int, double>;
+
+    VariantType value = 1337.42;
+    std::string buffer{};
+    auto err = write_dbus_binary(value, buffer);
+    expect(!err);
+
+    auto compare = std::vector<std::uint8_t>{
+      1,    'd',  0,                                  // length of signature + signature for double
+      0,    0,    0,    0,    0,                      // padding
+      0x48, 0xe1, 0x7a, 0x14, 0xae, 0xe5, 0x94, 0x40  // double value (6.28 in little-endian format)
     };
     expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
     expect(std::equal(buffer.begin(), buffer.end(), compare.begin(), compare.end(), uint8_cmp));
