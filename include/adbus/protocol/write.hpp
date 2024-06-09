@@ -165,6 +165,15 @@ struct to_dbus_binary<number_t> {
   }
 };
 
+template <typename T>
+  requires(std::is_enum_v<T> && !glz::detail::glaze_enum_t<T>)
+struct to_dbus_binary<T> {
+  template <options Opts>
+  static constexpr void op(auto&& value, auto&&... args) noexcept {
+    to_dbus_binary<std::underlying_type_t<T>>::template op<Opts>(std::to_underlying(value), std::forward<decltype(args)>(args)...);
+  }
+};
+
 template <glz::detail::string_like string_t>
 struct to_dbus_binary<string_t> {
   template <options Opts>
@@ -180,6 +189,25 @@ struct to_dbus_binary<string_t> {
     std::memcpy(buffer.data() + idx, value.data(), n);
     idx += n;
     buffer[idx++] = '\0';
+  }
+};
+
+template <typename T>
+ requires(std::is_enum_v<T> && glz::detail::glaze_enum_t<T>)
+struct to_dbus_binary<T> {
+  template <options Opts>
+  static constexpr void op(auto&& value, is_context auto&& ctx, auto&&... args) noexcept {
+    // copy from glaze json/write.hpp
+    using key_t = std::underlying_type_t<T>;
+    static constexpr auto frozen_map = glz::detail::make_enum_to_string_map<T>();
+    const auto& member_it = frozen_map.find(static_cast<key_t>(value));
+    if (member_it != frozen_map.end()) {
+      const std::string_view str = {member_it->second.data(), member_it->second.size()};
+      to_dbus_binary<std::string_view>::op<Opts>(str, ctx, std::forward<decltype(args)>(args)...);
+    }
+    else [[unlikely]] {
+      ctx.err = error{ .code = error_code::invalid_enum_conversion };
+    }
   }
 };
 

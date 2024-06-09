@@ -12,6 +12,8 @@
 #include <adbus/protocol/signature.hpp>
 #include <adbus/protocol/write.hpp>
 
+#include "common.hpp"
+
 using namespace boost::ut;
 using std::string_view_literals::operator""sv;
 using std::string_literals::operator""s;
@@ -102,6 +104,23 @@ int main() {
         number_test<double>{ .value = 1337.42, .expected = { 0x48, 0xe1, 0x7a, 0x14, 0xae, 0xe5, 0x94, 0x40 } },
         number_test<double>{ .value = -1337.42, .expected = { 0x48, 0xe1, 0x7a, 0x14, 0xae, 0xe5, 0x94, 0xc0 } },
       };
+
+  "enum as number"_test = [] {
+    std::string buffer{};
+    auto err = write_dbus_binary(enum_as_number::b, buffer);
+    expect(!err);
+    expect(buffer.size() == sizeof(std::uint8_t));
+    expect(buffer[0] == std::to_underlying(enum_as_number::b));
+  };
+
+  "enum as string"_test = [] {
+    std::string buffer{};
+    auto err = write_dbus_binary(enum_as_string::b, buffer);
+    expect(!err);
+    auto compare = std::vector<std::uint8_t>{ 1, 0, 0, 0, 'b', 0 };
+    expect(buffer.size() == compare.size());
+    expect(std::equal(buffer.begin(), buffer.end(), compare.begin(), compare.end(), uint8_cmp));
+  };
 
   "bool"_test = [](auto value) {
     std::string buffer{};

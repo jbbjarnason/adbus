@@ -20,6 +20,7 @@ enum struct error_code : std::uint8_t {
   buffer_too_small,
   string_too_long,
   array_too_long,
+  invalid_enum_conversion, // to string
 };
 
 struct error final {
