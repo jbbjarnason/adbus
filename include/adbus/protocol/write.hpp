@@ -277,7 +277,7 @@ struct to_dbus_binary<T> {
           if constexpr (glz::detail::reflectable<T>) {
             return std::get<I>(t);
           } else {
-            return get<member_index>(get<I>(glz::meta_v<std::decay_t<T>>));
+            return glz::get<member_index>(glz::get<I>(glz::meta_v<std::decay_t<T>>));
           }
         }();
         auto& member_ref = glz::detail::get_member(value, member);

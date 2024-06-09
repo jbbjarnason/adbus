@@ -64,6 +64,19 @@ struct foo {
   std::string b{};
 };
 
+// non reflectable struct
+struct bar_meta {
+  explicit bar_meta(std::uint64_t) {}
+  std::string a{ "bar" };
+  std::uint64_t b{ 13 };
+};
+
+template <>
+struct glz::meta<bar_meta> {
+  static constexpr auto name{ "bar_meta"sv };
+  static constexpr auto value = glz::object("a", &bar_meta::a, "b", &bar_meta::b);
+};
+
 int main() {
   using adbus::protocol::write_dbus_binary;
 
@@ -373,6 +386,19 @@ int main() {
       'e', 'n', 'd', 0  // string content + null terminator
     };
 
+    expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
+    expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
+  };
+
+  "non reflectable struct"_test = [] {
+    std::string buffer{};
+    auto err = write_dbus_binary(bar_meta{ 13 }, buffer);
+    expect(!err);
+    auto compare = std::vector<std::uint8_t>{ //
+      3, 0, 0, 0,            // string length
+      'b', 'a', 'r', 0,      // string
+      13, 0, 0, 0, 0, 0, 0, 0// int value
+    };
     expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
     expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
   };
