@@ -6,9 +6,11 @@
 
 #include <glaze/concepts/container_concepts.hpp>
 #include <glaze/core/common.hpp>
+#include <glaze/util/variant.hpp>
 
 #include <adbus/core/context.hpp>
 #include <adbus/util/concepts.hpp>
+#include <adbus/protocol/signature.hpp>
 
 namespace adbus::protocol {
 
@@ -150,18 +152,16 @@ struct to_dbus_binary : std::false_type {};
 template <>
 struct to_dbus_binary<bool> {
   template <options Opts>
-  static constexpr void op(auto&& value, is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
-    dbus_marshall(static_cast<std::uint32_t>(value), std::forward<decltype(ctx)>(ctx),
-                  std::forward<decltype(buffer)>(buffer), std::forward<decltype(idx)>(idx));
+  static constexpr void op(auto&& value, auto&&... args) noexcept {
+    dbus_marshall(static_cast<std::uint32_t>(value), std::forward<decltype(args)>(args)...);
   }
 };
 
 template <glz::detail::num_t number_t>
 struct to_dbus_binary<number_t> {
   template <options Opts>
-  static constexpr void op(auto&& value, [[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
-    dbus_marshall(std::forward<decltype(value)>(value), std::forward<decltype(ctx)>(ctx),
-                  std::forward<decltype(buffer)>(buffer), std::forward<decltype(idx)>(idx));
+  static constexpr void op(auto&&... args) noexcept {
+    dbus_marshall(std::forward<decltype(args)>(args)...);
   }
 };
 
@@ -241,6 +241,19 @@ struct to_dbus_binary<T> {
     const auto& [key, value]{ pair };
     to_dbus_binary<typename T::first_type>::template op<Opts>(key, args...);
     to_dbus_binary<typename T::second_type>::template op<Opts>(value, args...);
+  }
+};
+
+template <glz::is_variant T>
+struct to_dbus_binary<T> {
+  template <options Opts>
+  static constexpr void op(auto&& variant, auto&&... args) noexcept {
+    std::visit([&](auto&& value) {
+      using V = std::decay_t<decltype(value)>;
+      auto signature{ type::signature(type::signature_v<V>) };
+      to_dbus_binary<decltype(signature)>::op<Opts>(signature, args...);
+      to_dbus_binary<V>::template op<Opts>(value, args...);
+    }, variant);
   }
 };
 

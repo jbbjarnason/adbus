@@ -442,6 +442,26 @@ int main() {
     expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
   };
 
+  "variant_string_test"_test = [] {
+    using VariantType = std::variant<std::string, int, double>;
+
+    VariantType value = std::string{"variant"};
+    std::string buffer{};
+    auto err = write_dbus_binary(value, buffer);
+    expect(!err);
+
+    // Create the expected buffer manually
+    // Example marshaled data
+    auto compare = std::vector<std::uint8_t>{
+      1, 's', 0,                              // length of signature + signature for string
+      0,                                      // padding
+      7, 0, 0, 0,                             // string length
+      'v', 'a', 'r', 'i', 'a', 'n', 't', 0    // string content + null terminator
+    };
+    expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
+    expect(std::equal(buffer.begin(), buffer.end(), compare.begin(), compare.end(), uint8_cmp));
+  };
+
   "alignment or padding"_test =
       [](auto test) {
         std::string buffer{};
