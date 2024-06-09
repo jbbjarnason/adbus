@@ -216,6 +216,7 @@ struct to_dbus_binary<T> {
     }
 
     std::uint32_t size_placeholder{};
+    pad<decltype(size_placeholder)>(buffer, idx); // let's manually pad here to get the REAL index of the placeholder
     const auto placeholder_idx{ idx };
     dbus_marshall(size_placeholder, ctx, buffer, idx);
     pad<typename std::decay_t<decltype(value)>::value_type>(buffer, idx);  // n does not include the padding after the length

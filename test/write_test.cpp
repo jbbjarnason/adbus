@@ -430,9 +430,8 @@ int main() {
       44, 0x00, 0x00, 0x00,                                 // Length of the outer array (44 bytes)
       0x08, 0x00, 0x00, 0x00,                               // Length of the string outerKey
       'o',  'u',  't',  'e',  'r',  'K',  'e',  'y', 0x00,  // outerKey
-      // TODO I think this is wrong I think the padding is supposed to be here instead of below
-      24, 0x00, 0x00, 0x00,                                 // Length of the inner array (24 bytes)
       0, 0, 0,                                              // padding
+      24, 0x00, 0x00, 0x00,                                 // Length of the inner array (24 bytes)
       0x08, 0x00, 0x00, 0x00,                               // Length of the string innerKey
       'i',  'n',  'n',  'e',  'r',  'K',  'e',  'y', 0x00,  // innerKey
       0, 0, 0,                                              // padding
