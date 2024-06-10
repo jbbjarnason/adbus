@@ -21,6 +21,7 @@ namespace adbus::protocol::type {
 using std::string_view_literals::operator""sv;
 
 struct signature {
+  constexpr signature() noexcept = default;
   constexpr explicit signature(std::string_view sv) noexcept {
     assert(sv.size() <= 255 && "signature size must be less than 255");
     size_ = sv.size();
@@ -29,10 +30,18 @@ struct signature {
   constexpr explicit operator std::string_view() const noexcept { return { data_.data(), size_ }; }
   [[nodiscard]] constexpr auto size() const noexcept -> std::uint8_t { return size_; }
   [[nodiscard]] constexpr auto data() const noexcept -> decltype(auto) { return data_.data(); }
+  [[nodiscard]] constexpr auto data() noexcept -> decltype(auto) { return data_.data(); }
+  constexpr auto operator== (const signature& other) const noexcept -> bool {
+    return size_ == other.size_ && std::equal(std::begin(data_), std::begin(data_) + size_, std::begin(other.data_));
+  }
   static constexpr auto dbus_signature{ true }; // flag to indicate this is a dbus signature for concept
   std::uint8_t size_{};
   std::array<char, 255> data_{};
 };
+
+constexpr auto format_as(signature const& s) noexcept -> std::string_view {
+  return std::string_view{ s };
+}
 
 template <typename T = void>
 struct signature_meta : std::false_type {};

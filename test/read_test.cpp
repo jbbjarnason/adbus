@@ -90,6 +90,9 @@ int main() {
 
   using adbus::protocol::type::signature;
   "signature"_test = generic_test_case | std::tuple{
-    generic_test<signature>{}
+    generic_test<signature>{
+        .expected = signature{ adbus::protocol::type::signature_v<foo> },
+        .buffer = { signature{ adbus::protocol::type::signature_v<foo> }.size(), '(', 't', 'a', '(', 's', 't', ')', 'a', '(', 's', 't', ')', 's', ')', '\0' }
+    }
   };
 }

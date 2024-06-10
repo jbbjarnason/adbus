@@ -76,6 +76,26 @@ struct from_dbus_binary<T> {
   }
 };
 
+template <adbus::type::is_signature T>
+struct from_dbus_binary<T> {
+  template <options Opts>
+  static constexpr void op(auto&& value, is_context auto&& ctx, auto&& it, auto&& end) noexcept {
+    std::uint8_t size{};
+    from_dbus_binary<std::uint32_t>::template op<Opts>(size, ctx, it, end);
+    if (ctx.err) [[unlikely]] {
+      return;
+    }
+    if (it + size > end) [[unlikely]] {
+      ctx.err = error{ error_code::out_of_range };
+      return;
+    }
+    using V = std::decay_t<decltype(value)>;
+    std::memcpy(value.data(), &*it, size);
+    value.size_ = size; // todo could we do this differently?
+    it += size + 1;  // the +1 is for the null terminator
+  }
+};
+
 template <typename T>
   requires(std::is_enum_v<T> && glz::detail::glaze_enum_t<T>)
 struct from_dbus_binary<T> {
