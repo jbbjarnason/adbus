@@ -14,7 +14,26 @@ struct from_dbus_binary;
 
 template <num_t T>
 struct from_dbus_binary<T> {
-  static constexpr void read(auto&& value, is_context auto&& ctx, auto&& it, auto&& end) noexcept {
+  template <options Opts>
+  static constexpr void op(auto&& value, is_context auto&& ctx, auto&& it, auto&& end) noexcept {
+    using V = std::decay_t<decltype(value)>;
+    if (it + sizeof(V) > end) [[unlikely]] {
+      ctx.err = error{ error_code::out_of_range };
+      return;
+    }
+    std::memcpy(&value, it, sizeof(V));
+    it += sizeof(V);
+  }
+};
+
+template <typename T>
+  requires(std::is_enum_v<T> && !glz::detail::glaze_enum_t<T>)
+struct from_dbus_binary<T> {
+  template <options Opts>
+  static constexpr void op(auto&& value, auto&&... args) noexcept {
+    using V = std::underlying_type_t<T>;
+    // todo reinterpret_cast is not nice, but it provides less code bloat
+    from_dbus_binary<V>::template op<Opts>(reinterpret_cast<V&>(value), std::forward<decltype(args)>(args)...);
   }
 };
 
@@ -22,7 +41,9 @@ struct from_dbus_binary<T> {
 
 template <typename T, typename Buffer>
 [[nodiscard]] constexpr auto read_dbus_binary(T&& value, Buffer&& buffer) noexcept -> error {
-
+  context ctx{};
+  detail::from_dbus_binary<std::decay_t<T>>::template op<{}>(value, ctx, std::begin(buffer), std::end(buffer));
+  return ctx.err;
 }
 
 template <typename T, class Buffer>

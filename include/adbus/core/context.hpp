@@ -21,6 +21,8 @@ enum struct error_code : std::uint8_t {
   string_too_long,
   array_too_long,
   invalid_enum_conversion, // to string
+  // read errors
+  out_of_range, // if buffer is smaller than the expected input is
 };
 
 struct error final {
