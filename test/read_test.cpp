@@ -87,4 +87,9 @@ int main() {
         .buffer = { 1, 0, 0, 0, 'c', '\0' },
     },
   };
+
+  using adbus::protocol::type::signature;
+  "signature"_test = generic_test_case | std::tuple{
+    generic_test<signature>{}
+  };
 }

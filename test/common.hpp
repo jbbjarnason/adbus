@@ -37,3 +37,15 @@ constexpr auto format_as(enum_as_string e) noexcept -> std::string_view {
   }
   return "unknown";
 }
+
+struct foo {
+  struct bar {
+    std::string a{};
+    std::uint64_t b{};
+  };
+  std::uint64_t a{};
+  std::vector<bar> bars{};
+  std::vector<bar> bars2{};
+  std::string b{};
+};
+

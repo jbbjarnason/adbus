@@ -55,17 +55,6 @@ constexpr auto uint8_cmp{ [](auto&& a, auto&& b) -> bool {
   return foo;
 } };
 
-struct foo {
-  struct bar {
-    std::string a{};
-    std::uint64_t b{};
-  };
-  std::uint64_t a{};
-  std::vector<bar> bars{};
-  std::vector<bar> bars2{};
-  std::string b{};
-};
-
 // non reflectable struct
 struct bar_meta {
   explicit bar_meta(std::uint64_t) {}
