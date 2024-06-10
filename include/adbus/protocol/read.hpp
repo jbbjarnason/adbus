@@ -21,7 +21,7 @@ struct from_dbus_binary<T> {
       ctx.err = error{ error_code::out_of_range };
       return;
     }
-    std::memcpy(&value, it, sizeof(V));
+    std::memcpy(&value, &*it, sizeof(V));
     it += sizeof(V);
   }
 };
@@ -63,16 +63,37 @@ struct from_dbus_binary<T> {
     using V = std::decay_t<decltype(value)>;
     if constexpr (glz::resizable<V>) {
       value.resize(size);
-      std::memcpy(value.data(), it, size);
+      std::memcpy(value.data(), &*it, size);
     }
     else if constexpr (glz::is_specialization_v<V, std::basic_string_view>) {
       using char_type = typename V::value_type;
-      value = std::basic_string_view<char_type>{ reinterpret_cast<const char_type*>(it), size };
+      value = std::basic_string_view<char_type>{ reinterpret_cast<const char_type*>(&*it), size };
     }
     else {
       static_assert(glz::false_v<V>, "unsupported type");
     }
     it += size + 1;  // the +1 is for the null terminator
+  }
+};
+
+template <typename T>
+  requires(std::is_enum_v<T> && glz::detail::glaze_enum_t<T>)
+struct from_dbus_binary<T> {
+  template <options Opts>
+  static constexpr void op(auto&& value, is_context auto&& ctx, auto&&... args) noexcept {
+    std::string_view substitute{};
+    from_dbus_binary<std::string_view>::template op<Opts>(substitute, ctx, std::forward<decltype(args)>(args)...);
+    if (ctx.err) [[unlikely]] {
+      return;
+    }
+    static constexpr auto frozen_map = glz::detail::make_string_to_enum_map<T>();
+    const auto& member_it = frozen_map.find(substitute);
+    if (member_it != frozen_map.end()) {
+      value = member_it->second;
+    }
+    else [[unlikely]] {
+      ctx.err = error{ error_code::unexpected_enum };
+    }
   }
 };
 

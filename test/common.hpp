@@ -28,3 +28,12 @@ constexpr auto format_as(enum_as_number e) noexcept -> std::string_view {
   }
   return "unknown";
 }
+
+constexpr auto format_as(enum_as_string e) noexcept -> std::string_view {
+  switch (e) {
+    case enum_as_string::a: return "a";
+    case enum_as_string::b: return "b";
+    case enum_as_string::c: return "c";
+  }
+  return "unknown";
+}

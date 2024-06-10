@@ -23,6 +23,7 @@ enum struct error_code : std::uint8_t {
   invalid_enum_conversion, // to string
   // read errors
   out_of_range, // if buffer is smaller than the expected input is
+  unexpected_enum, // from string
 };
 
 struct error final {

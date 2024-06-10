@@ -18,10 +18,10 @@ using namespace boost::ut;
 using std::string_view_literals::operator""sv;
 using std::string_literals::operator""s;
 
-template <typename T, std::size_t N = sizeof(T)>
+template <typename T>
 struct generic_test {
   T expected{};
-  std::array<std::uint8_t, N> buffer{};
+  std::vector<std::uint8_t> buffer{};
 };
 
 constexpr auto generic_test_case = [](auto&& test) {
@@ -56,20 +56,35 @@ int main() {
   };
 
   "bool"_test = generic_test_case | std::tuple{
-    generic_test<bool, sizeof(std::uint32_t)>{ .expected = true, .buffer = { 0x01, 0x00, 0x00, 0x00 } },
-    generic_test<bool, sizeof(std::uint32_t)>{ .expected = false, .buffer = { 0x00, 0x00, 0x00, 0x00 } },
+    generic_test<bool>{ .expected = true, .buffer = { 0x01, 0x00, 0x00, 0x00 } },
+    generic_test<bool>{ .expected = false, .buffer = { 0x00, 0x00, 0x00, 0x00 } },
   };
 
   "string"_test = generic_test_case | std::tuple{
-    generic_test<std::string, 22>{ .expected = "this is a message",
-                                   .buffer = { 17,  0,   0,   0,   't', 'h', 'i', 's', ' ', 'i', 's',
-                                               ' ', 'a', ' ', 'm', 'e', 's', 's', 'a', 'g', 'e', '\0' } },
+    generic_test<std::string>{ .expected = "this is a message",
+                               .buffer = { 17,  0,   0,   0,   't', 'h', 'i', 's', ' ', 'i', 's',
+                                           ' ', 'a', ' ', 'm', 'e', 's', 's', 'a', 'g', 'e', '\0' } },
   };
 
   "string_view"_test = generic_test_case | std::tuple{
-    generic_test<std::string_view, 22>{ .expected = "this is a message",
-                                        .buffer = { 17,  0,   0,   0,   't', 'h', 'i', 's', ' ', 'i', 's',
-                                                    ' ', 'a', ' ', 'm', 'e', 's', 's', 'a', 'g', 'e', '\0' } },
-    generic_test<std::string_view, 10>{ .expected = "það", .buffer = { 5, 0, 0, 0, 195, 190, 'a', 195, 176, '\0' } },
+    generic_test<std::string_view>{ .expected = "this is a message",
+                                    .buffer = { 17,  0,   0,   0,   't', 'h', 'i', 's', ' ', 'i', 's',
+                                                ' ', 'a', ' ', 'm', 'e', 's', 's', 'a', 'g', 'e', '\0' } },
+    generic_test<std::string_view>{ .expected = "það", .buffer = { 5, 0, 0, 0, 195, 190, 'a', 195, 176, '\0' } },
+  };
+
+  "enum as string"_test = generic_test_case | std::tuple{
+    generic_test<enum_as_string>{
+        .expected = enum_as_string::a,
+        .buffer = { 1, 0, 0, 0, 'a', '\0' },
+    },
+    generic_test<enum_as_string>{
+        .expected = enum_as_string::b,
+        .buffer = { 1, 0, 0, 0, 'b', '\0' },
+    },
+    generic_test<enum_as_string>{
+        .expected = enum_as_string::c,
+        .buffer = { 1, 0, 0, 0, 'c', '\0' },
+    },
   };
 }
