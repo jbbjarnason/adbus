@@ -184,6 +184,7 @@ struct to_dbus_binary<string_t> {
     }
     const auto n{ static_cast<std::uint32_t>(value.size()) };
     dbus_marshall(n, ctx, buffer, idx);
+    // todo for fixed buffer, we need to check if we still have space
     // +1 for the null terminator
     resize(buffer, idx, n + 1);
     std::memcpy(buffer.data() + idx, value.data(), n);

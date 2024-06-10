@@ -47,6 +47,23 @@ struct from_dbus_binary<bool> {
   }
 };
 
+template <string_like T>
+struct from_dbus_binary<T> {
+  template <options Opts>
+  static constexpr void op(auto&& value, is_context auto&& ctx, auto&& it, auto&& end) noexcept {
+    std::uint32_t size{};
+    from_dbus_binary<std::uint32_t>::template op<Opts>(size, ctx, it, end);
+    if (ctx.err) [[unlikely]] {
+      return;
+    }
+    if (it + size > end) [[unlikely]] {
+      ctx.err = error{ error_code::out_of_range };
+      return;
+    }
+    value.assign(it, it + size);
+    it += size + 1;  // the +1 is for the null terminator
+  }
+};
 
 }  // namespace detail
 
