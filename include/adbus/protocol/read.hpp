@@ -64,12 +64,10 @@ struct from_dbus_binary<T> {
     if constexpr (glz::resizable<V>) {
       value.resize(size);
       std::memcpy(value.data(), &*it, size);
-    }
-    else if constexpr (glz::is_specialization_v<V, std::basic_string_view>) {
+    } else if constexpr (glz::is_specialization_v<V, std::basic_string_view>) {
       using char_type = typename V::value_type;
       value = std::basic_string_view<char_type>{ reinterpret_cast<const char_type*>(&*it), size };
-    }
-    else {
+    } else {
       static_assert(glz::false_v<V>, "unsupported type");
     }
     it += size + 1;  // the +1 is for the null terminator
@@ -91,8 +89,8 @@ struct from_dbus_binary<T> {
     }
     using V = std::decay_t<decltype(value)>;
     std::memcpy(value.data(), &*it, size);
-    value.size_ = size; // todo could we do this differently?
-    it += size + 1;  // the +1 is for the null terminator
+    value.size_ = size;  // todo could we do this differently?
+    it += size + 1;      // the +1 is for the null terminator
   }
 };
 
@@ -110,9 +108,36 @@ struct from_dbus_binary<T> {
     const auto& member_it = frozen_map.find(substitute);
     if (member_it != frozen_map.end()) {
       value = member_it->second;
-    }
-    else [[unlikely]] {
+    } else [[unlikely]] {
       ctx.err = error{ error_code::unexpected_enum };
+    }
+  }
+};
+
+template <container T>
+struct from_dbus_binary<T> {
+  template <options Opts>
+  static constexpr void op(auto&& value, is_context auto&& ctx, auto&& it, auto&& end) noexcept {
+    std::uint32_t size{};
+    from_dbus_binary<std::uint32_t>::template op<Opts>(size, ctx, it, end);
+    if (ctx.err) [[unlikely]] {
+      return;
+    }
+    if (it + size > end) [[unlikely]] {
+      ctx.err = error{ error_code::out_of_range };
+      return;
+    }
+    using V = std::decay_t<decltype(value)>;
+    value.clear();
+    while (size > 0) {
+      typename V::value_type element{};
+      auto const beginning_of_element = it;
+      from_dbus_binary<typename V::value_type>::template op<Opts>(element, ctx, it, end);
+      if (ctx.err) [[unlikely]] {
+        return;
+      }
+      size -= it - beginning_of_element;
+      value.emplace_back(std::move(element));
     }
   }
 };

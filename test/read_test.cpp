@@ -18,6 +18,19 @@ using namespace boost::ut;
 using std::string_view_literals::operator""sv;
 using std::string_literals::operator""s;
 
+namespace std {
+template <adbus::container T>
+constexpr auto format_as(T&& v) noexcept -> std::string {
+  std::string str;
+  str += '[';
+  for (auto&& i : v) {
+    str += fmt::format("{}, ", i);
+  }
+  str += ']';
+  return str;
+}
+}
+
 template <typename T>
 struct generic_test {
   T expected{};
@@ -95,4 +108,18 @@ int main() {
         .buffer = { signature{ adbus::protocol::type::signature_v<foo> }.size(), '(', 't', 'a', '(', 's', 't', ')', 'a', '(', 's', 't', ')', 's', ')', '\0' }
     }
   };
+
+  "vector trivial value_type"_test = generic_test_case | std::tuple{
+    generic_test{
+        .expected = std::vector{ 10UL, 20UL, 30UL },
+        .buffer = {
+            24, 0, 0, 0,              // size
+            0,  0, 0, 0,              // padding
+            10, 0, 0, 0, 0, 0, 0, 0,  // 10
+            20, 0, 0, 0, 0, 0, 0, 0,  // 20
+            30, 0, 0, 0, 0, 0, 0, 0,  // 30
+        },
+    },
+  };
+
 }
