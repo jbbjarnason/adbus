@@ -37,6 +37,17 @@ struct from_dbus_binary<T> {
   }
 };
 
+template <>
+struct from_dbus_binary<bool> {
+  template <options Opts>
+  static constexpr void op(auto&& value, auto&&... args) noexcept {
+    std::uint32_t substitute{};
+    from_dbus_binary<std::uint32_t>::template op<Opts>(substitute, std::forward<decltype(args)>(args)...);
+    value = substitute != 0;
+  }
+};
+
+
 }  // namespace detail
 
 template <typename T, typename Buffer>
