@@ -60,7 +60,18 @@ struct from_dbus_binary<T> {
       ctx.err = error{ error_code::out_of_range };
       return;
     }
-    value.assign(it, it + size);
+    using V = std::decay_t<decltype(value)>;
+    if constexpr (glz::resizable<V>) {
+      value.resize(size);
+      std::memcpy(value.data(), it, size);
+    }
+    else if constexpr (glz::is_specialization_v<V, std::basic_string_view>) {
+      using char_type = typename V::value_type;
+      value = std::basic_string_view<char_type>{ reinterpret_cast<const char_type*>(it), size };
+    }
+    else {
+      static_assert(glz::false_v<V>, "unsupported type");
+    }
     it += size + 1;  // the +1 is for the null terminator
   }
 };

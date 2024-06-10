@@ -65,4 +65,11 @@ int main() {
                                    .buffer = { 17,  0,   0,   0,   't', 'h', 'i', 's', ' ', 'i', 's',
                                                ' ', 'a', ' ', 'm', 'e', 's', 's', 'a', 'g', 'e', '\0' } },
   };
+
+  "string_view"_test = generic_test_case | std::tuple{
+    generic_test<std::string_view, 22>{ .expected = "this is a message",
+                                        .buffer = { 17,  0,   0,   0,   't', 'h', 'i', 's', ' ', 'i', 's',
+                                                    ' ', 'a', ' ', 'm', 'e', 's', 's', 'a', 'g', 'e', '\0' } },
+    generic_test<std::string_view, 10>{ .expected = "það", .buffer = { 5, 0, 0, 0, 195, 190, 'a', 195, 176, '\0' } },
+  };
 }
