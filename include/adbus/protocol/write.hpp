@@ -70,12 +70,12 @@ constexpr void resize(auto&& buffer, auto&& idx, auto&& n) noexcept {
 template <typename T>
 struct padding;
 
-template <glz::detail::num_t T>
+template <num_t T>
 struct padding<T> {
   static constexpr std::size_t value{ sizeof(T) };
 };
 
-template <glz::detail::string_like T>
+template <string_like T>
 struct padding<T> {
   static constexpr std::size_t value{ sizeof(std::uint32_t) };
 };
@@ -157,7 +157,7 @@ struct to_dbus_binary<bool> {
   }
 };
 
-template <glz::detail::num_t number_t>
+template <num_t number_t>
 struct to_dbus_binary<number_t> {
   template <options Opts>
   static constexpr void op(auto&&... args) noexcept {
@@ -174,10 +174,10 @@ struct to_dbus_binary<T> {
   }
 };
 
-template <glz::detail::string_like string_t>
+template <string_like string_t>
 struct to_dbus_binary<string_t> {
   template <options Opts>
-  static constexpr void op(auto&& value, [[maybe_unused]] is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
+  static constexpr void op(auto&& value, is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
     if (value.size() > std::numeric_limits<std::uint32_t>::max()) [[unlikely]] {
       ctx.err = error{ .code = error_code::string_too_long };
       return;

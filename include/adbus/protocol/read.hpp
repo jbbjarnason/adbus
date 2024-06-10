@@ -3,6 +3,7 @@
 #include <glaze/util/expected.hpp>
 
 #include <adbus/core/context.hpp>
+#include <adbus/util/concepts.hpp>
 
 namespace adbus::protocol {
 
@@ -10,6 +11,12 @@ namespace detail {
 
 template <typename T>
 struct from_dbus_binary;
+
+template <num_t T>
+struct from_dbus_binary<T> {
+  static constexpr void read(auto&& value, is_context auto&& ctx, auto&& it, auto&& end) noexcept {
+  }
+};
 
 }  // namespace detail
 

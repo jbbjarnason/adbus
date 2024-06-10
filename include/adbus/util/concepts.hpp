@@ -17,6 +17,9 @@ concept fixed_size = requires {
 }  // namespace detail
 
 template <typename T>
+concept num_t = glz::detail::num_t<T>;
+
+template <typename T>
 concept arithmetic = std::is_arithmetic_v<std::decay_t<T>>;
 
 template <typename T>
