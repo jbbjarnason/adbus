@@ -41,7 +41,7 @@ constexpr auto generic_test_case = [](auto&& test) {
   using value_t = std::decay_t<decltype(test.expected)>;
   value_t value{};
   auto err = adbus::protocol::read_dbus_binary(value, test.buffer);
-  expect(!err);
+  expect(!err) << fmt::format("error: {}", err);
   expect(value == test.expected) << fmt::format("expected: {}, got: {}", test.expected, value);
 };
 

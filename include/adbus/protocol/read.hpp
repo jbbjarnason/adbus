@@ -4,10 +4,27 @@
 
 #include <adbus/core/context.hpp>
 #include <adbus/util/concepts.hpp>
+#include <adbus/protocol/padding.hpp>
 
 namespace adbus::protocol {
 
 namespace detail {
+
+template <typename T>
+constexpr void skip_padding(auto&& ctx, auto&& begin, auto&& it, auto&& end) noexcept {
+  constexpr auto alignment{ padding<T>::value };
+  // idx % alignment: This computes the offset of idx from the nearest previous alignment boundary.
+  // alignment - (idx % alignment): This calculates how much padding is needed to reach the next alignment boundary.
+  // (alignment - (idx % alignment)) % alignment: This ensures that if idx is already aligned (i.e., idx % alignment == 0),
+  // the padding is 0 instead of alignment.
+  const auto position = std::distance(begin, it);
+  const auto padding = (alignment - (position % alignment)) % alignment;
+  if (it + padding > end) [[unlikely]] {
+    ctx.err = error{ error_code::out_of_range };
+    return;
+  }
+  std::advance(it, padding);
+}
 
 template <typename T>
 struct from_dbus_binary;
@@ -15,14 +32,18 @@ struct from_dbus_binary;
 template <num_t T>
 struct from_dbus_binary<T> {
   template <options Opts>
-  static constexpr void op(auto&& value, is_context auto&& ctx, auto&& it, auto&& end) noexcept {
+  static constexpr void op(auto&& value, is_context auto&& ctx, auto&& begin, auto&& it, auto&& end) noexcept {
     using V = std::decay_t<decltype(value)>;
+    skip_padding<V>(ctx, begin, it, end);
+    if (ctx.err) [[unlikely]] {
+      return;
+    }
     if (it + sizeof(V) > end) [[unlikely]] {
       ctx.err = error{ error_code::out_of_range };
       return;
     }
     std::memcpy(&value, &*it, sizeof(V));
-    it += sizeof(V);
+    std::advance(it, sizeof(V));
   }
 };
 
@@ -50,9 +71,9 @@ struct from_dbus_binary<bool> {
 template <string_like T>
 struct from_dbus_binary<T> {
   template <options Opts>
-  static constexpr void op(auto&& value, is_context auto&& ctx, auto&& it, auto&& end) noexcept {
+  static constexpr void op(auto&& value, is_context auto&& ctx, auto&& begin, auto&& it, auto&& end) noexcept {
     std::uint32_t size{};
-    from_dbus_binary<std::uint32_t>::template op<Opts>(size, ctx, it, end);
+    from_dbus_binary<std::uint32_t>::template op<Opts>(size, ctx, begin, it, end);
     if (ctx.err) [[unlikely]] {
       return;
     }
@@ -70,16 +91,16 @@ struct from_dbus_binary<T> {
     } else {
       static_assert(glz::false_v<V>, "unsupported type");
     }
-    it += size + 1;  // the +1 is for the null terminator
+    std::advance(it, size + 1); // the +1 is for the null terminator
   }
 };
 
 template <adbus::type::is_signature T>
 struct from_dbus_binary<T> {
   template <options Opts>
-  static constexpr void op(auto&& value, is_context auto&& ctx, auto&& it, auto&& end) noexcept {
+  static constexpr void op(auto&& value, is_context auto&& ctx, auto&& begin, auto&& it, auto&& end) noexcept {
     std::uint8_t size{};
-    from_dbus_binary<std::uint32_t>::template op<Opts>(size, ctx, it, end);
+    from_dbus_binary<std::uint32_t>::template op<Opts>(size, ctx, begin, it, end);
     if (ctx.err) [[unlikely]] {
       return;
     }
@@ -90,7 +111,7 @@ struct from_dbus_binary<T> {
     using V = std::decay_t<decltype(value)>;
     std::memcpy(value.data(), &*it, size);
     value.size_ = size;  // todo could we do this differently?
-    it += size + 1;      // the +1 is for the null terminator
+    std::advance(it, size + 1); // the +1 is for the null terminator
   }
 };
 
@@ -117,27 +138,34 @@ struct from_dbus_binary<T> {
 template <container T>
 struct from_dbus_binary<T> {
   template <options Opts>
-  static constexpr void op(auto&& value, is_context auto&& ctx, auto&& it, auto&& end) noexcept {
-    std::uint32_t size{};
-    from_dbus_binary<std::uint32_t>::template op<Opts>(size, ctx, it, end);
+  static constexpr void op(auto&& value, is_context auto&& ctx, auto&& begin, auto&& it, auto&& end) noexcept {
+    std::uint32_t n{};
+    from_dbus_binary<std::uint32_t>::template op<Opts>(n, ctx, begin, it, end);
     if (ctx.err) [[unlikely]] {
       return;
     }
-    if (it + size > end) [[unlikely]] {
+    skip_padding<typename std::decay_t<decltype(value)>::value_type>(ctx, begin, it, end);  // n does not include the padding after the length
+    if (ctx.err) [[unlikely]] {
+      return;
+    }
+    if (it + n > end) [[unlikely]] {
       ctx.err = error{ error_code::out_of_range };
       return;
     }
     using V = std::decay_t<decltype(value)>;
     value.clear();
-    while (size > 0) {
+    while (n > 0) {
       typename V::value_type element{};
       auto const beginning_of_element = it;
-      from_dbus_binary<typename V::value_type>::template op<Opts>(element, ctx, it, end);
+      from_dbus_binary<typename V::value_type>::template op<Opts>(element, ctx, begin, it, end);
       if (ctx.err) [[unlikely]] {
         return;
       }
-      size -= it - beginning_of_element;
+      n -= std::distance(beginning_of_element, it);
       value.emplace_back(std::move(element));
+    }
+    if (n != 0) [[unlikely]] {
+      ctx.err = error{ error_code::out_of_range };
     }
   }
 };
@@ -147,7 +175,7 @@ struct from_dbus_binary<T> {
 template <typename T, typename Buffer>
 [[nodiscard]] constexpr auto read_dbus_binary(T&& value, Buffer&& buffer) noexcept -> error {
   context ctx{};
-  detail::from_dbus_binary<std::decay_t<T>>::template op<{}>(value, ctx, std::begin(buffer), std::end(buffer));
+  detail::from_dbus_binary<std::decay_t<T>>::template op<{}>(value, ctx, std::begin(buffer), std::begin(buffer), std::end(buffer));
   return ctx.err;
 }
 
