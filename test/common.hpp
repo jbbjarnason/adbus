@@ -42,12 +42,18 @@ struct foo {
   struct bar {
     std::string a{};
     std::uint64_t b{};
+    constexpr auto operator==(bar const&) const noexcept -> bool = default;
   };
   std::uint64_t a{};
   std::vector<bar> bars{};
   std::vector<bar> bars2{};
   std::string b{};
+  constexpr auto operator==(foo const&) const noexcept -> bool = default;
 };
+
+constexpr auto format_as(foo::bar const& b) -> std::string {
+  return fmt::format("a: {}, b: {}", b.a, b.b);
+}
 
 struct simple {
   std::uint8_t a{ 42 };
@@ -59,4 +65,5 @@ struct simple {
 constexpr auto format_as(simple const& s) -> std::string {
   return fmt::format("a: {}, b: {}, c: {}", s.a, s.b, s.c);
 }
+
 

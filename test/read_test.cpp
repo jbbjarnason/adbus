@@ -228,5 +228,30 @@ int main() {
       }
     }
   };
+  "vector of struct"_test = generic_test_case | std::tuple{
+    generic_test{
+      .expected = std::vector{ foo::bar{ "example1", 67890 }, { "example2", 13579 }, { "example3", 24680 } },
+      .buffer = {
+        // Vector size
+        76, 0, 0, 0,  // number of elements in vector (little-endian)
+
+        // bars[0] - {"example1", 67890}
+        8, 0, 0, 0,                                      // string length
+        'e', 'x', 'a', 'm', 'p', 'l', 'e', '1', 0,       // string content + null terminator
+        0, 0, 0, 0, 0, 0, 0,                             // + padding
+        0x32, 0x09, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  // 67890 (little-endian)
+
+        // bars[1] - {"example2", 13579}
+        8, 0, 0, 0,                                          // string length
+        'e', 'x', 'a', 'm', 'p', 'l', 'e', '2', 0, 0, 0, 0,  // string content + null terminator + padding
+        0x0B, 0x35, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      // 13579 (little-endian)
+
+        // bars[2] - {"example3", 24680}
+        8, 0, 0, 0,                                          // string length
+        'e', 'x', 'a', 'm', 'p', 'l', 'e', '3', 0, 0, 0, 0,  // string content + null terminator + padding
+        0x68, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      // 24680 (little-endian)
+      }
+    },
+  };
 
 }
