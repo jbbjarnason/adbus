@@ -317,4 +317,20 @@ int main() {
         },
     },
   };
+  "map"_test = generic_test_case | std::tuple{
+    generic_test{ .expected = std::map<std::string, std::uint64_t>{ { "key1", 123 }, { "key2", 456 } },
+                  .buffer = {
+                      44, 0x00, 0x00, 0x00,  // Length of the array (44 bytes)
+                      // First entry
+                      0x04, 0x00, 0x00, 0x00,                          // Length of the string key1 (4 bytes)
+                      'k', 'e', 'y', '1', 0x00,                        // key1
+                      0, 0, 0,                                         // padding
+                      0x7B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // Value 123 (64-bit)
+                      // Second entry
+                      0x04, 0x00, 0x00, 0x00,                         // Length of the string key2 (4 bytes)
+                      'k', 'e', 'y', '2', 0x00,                       // key2
+                      0, 0, 0, 0, 0, 0, 0,                            // padding
+                      0xC8, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00  // Value 456 (64-bit)
+                  } },
+  };
 }
