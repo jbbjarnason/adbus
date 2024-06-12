@@ -191,6 +191,15 @@ struct from_dbus_binary<T> {
   }
 };
 
+template <glz::detail::pair_t T>
+struct from_dbus_binary<T> {
+  template <options Opts>
+  static constexpr void op(auto&& pair, auto&&... args) noexcept {
+    // I think this is safe in this context, only used currently for maps
+    from_dbus_binary<typename T::first_type>::template op<Opts>(const_cast<std::remove_const_t<typename T::first_type>&>(pair.first), args...);
+    from_dbus_binary<typename T::second_type>::template op<Opts>(pair.second, args...);
+  }
+};
 
 template <typename  T>
   requires(glz::detail::glaze_object_t<T> || glz::detail::reflectable<T>)
@@ -224,6 +233,7 @@ struct from_dbus_binary<T> {
 }  // namespace detail
 
 template <typename T, typename Buffer>
+  requires std::is_lvalue_reference_v<T>
 [[nodiscard]] constexpr auto read_dbus_binary(T&& value, Buffer&& buffer) noexcept -> error {
   context ctx{};
   detail::from_dbus_binary<std::decay_t<T>>::template op<{}>(value, ctx, std::begin(buffer), std::begin(buffer), std::end(buffer));
