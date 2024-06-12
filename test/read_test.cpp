@@ -333,4 +333,20 @@ int main() {
                       0xC8, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00  // Value 456 (64-bit)
                   } },
   };
+  "Map of maps"_test = generic_test_case | std::tuple{
+    generic_test{
+      .expected = std::map<std::string, std::map<std::string, std::uint64_t>>{ { "outerKey", { { "innerKey", 789 } } } },
+      .buffer = {
+          44,   0x00, 0x00, 0x00,                               // Length of the outer array (44 bytes)
+          0x08, 0x00, 0x00, 0x00,                               // Length of the string outerKey
+          'o',  'u',  't',  'e',  'r',  'K',  'e',  'y', 0x00,  // outerKey
+          0,    0,    0,                                        // padding
+          24,   0x00, 0x00, 0x00,                               // Length of the inner array (24 bytes)
+          0x08, 0x00, 0x00, 0x00,                               // Length of the string innerKey
+          'i',  'n',  'n',  'e',  'r',  'K',  'e',  'y', 0x00,  // innerKey
+          0,    0,    0,                                        // padding
+          0x15, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00        // Value 789 (64-bit)
+        }
+    },
+  };
 }
