@@ -178,4 +178,18 @@ int main() {
       },
     },
   };
+  "vector of strings with padding"_test = generic_test_case | std::tuple{
+    generic_test{
+      .expected = std::vector{ "hello"s, "dbus"s, "world"s },
+      .buffer = {
+        34,  0,   0,   0,                  // size
+        5,   0,   0,   0,                  // length 1
+        'h', 'e', 'l', 'l', 'o', 0, 0, 0,  // string 1
+        4,   0,   0,   0,                  // length 2
+        'd', 'b', 'u', 's', 0,   0, 0, 0,  // string 2
+        5,   0,   0,   0,                  // length 3
+        'w', 'o', 'r', 'l', 'd', 0,        // string 3
+      },
+    },
+  };
 }
