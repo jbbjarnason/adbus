@@ -253,5 +253,42 @@ int main() {
       }
     },
   };
+  "more complex struct"_test = generic_test_case | std::tuple{
+    generic_test{
+      .expected = foo{ .a = 12345, .bars = { { "example1", 67890 }, { "example2", 13579 } }, .bars2 = { { "example3", 24680 } }, .b = "end" },
+      .buffer = {
+            // a
+            0x39, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 12345 (little-endian)
+
+            // bars - vector size
+            52, 0, 0, 0,  // number of elements in vector
+
+            // bars[0] - {"example1", 67890}
+            8, 0, 0, 0,                                      // string length
+            'e', 'x', 'a', 'm', 'p', 'l', 'e', '1', 0,       // string content + null terminator
+            0, 0, 0, 0, 0, 0, 0,                             // + padding
+            0x32, 0x09, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  // 67890 (little-endian)
+
+            // bars[1] - {"example2", 13579}
+            8, 0, 0, 0,                                      // string length
+            'e', 'x', 'a', 'm', 'p', 'l', 'e', '2', 0,       // string content + null terminator
+            0, 0, 0,                                         // + padding
+            0x0B, 0x35, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 13579 (little-endian)
+
+            // bars2 - vector size
+            28, 0, 0, 0,  // number of elements in vector
+
+            // bars2[0] - {"example3", 24680}
+            8, 0, 0, 0,                                      // string length
+            'e', 'x', 'a', 'm', 'p', 'l', 'e', '3', 0,       // string content + null terminator
+            0, 0, 0, 0, 0, 0, 0,                             // + padding
+            0x68, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 24680 (little-endian)
+
+            // b - "end"
+            3, 0, 0, 0,       // string length
+            'e', 'n', 'd', 0  // string content + null terminator
+      }
+    },
+  };
 
 }

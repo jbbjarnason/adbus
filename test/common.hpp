@@ -54,6 +54,9 @@ struct foo {
 constexpr auto format_as(foo::bar const& b) -> std::string {
   return fmt::format("a: {}, b: {}", b.a, b.b);
 }
+constexpr auto format_as(foo const& f) -> std::string {
+  return fmt::format("a: {}, b: {}, bars: {}, bars2: {}", f.a, f.b, fmt::join(f.bars, ", "), fmt::join(f.bars2, ", "));
+}
 
 struct simple {
   std::uint8_t a{ 42 };
