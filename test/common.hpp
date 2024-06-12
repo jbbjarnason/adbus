@@ -69,4 +69,20 @@ constexpr auto format_as(simple const& s) -> std::string {
   return fmt::format("a: {}, b: {}, c: {}", s.a, s.b, s.c);
 }
 
+// non reflectable struct
+struct bar_meta {
+  explicit bar_meta(std::uint64_t) {}
+  std::string a{ "bar" };
+  std::uint64_t b{ 13 };
+  constexpr auto operator==(bar_meta const&) const noexcept -> bool = default;
+};
 
+constexpr auto format_as(bar_meta const& b) -> std::string {
+  return fmt::format("a: {}, b: {}", b.a, b.b);
+}
+
+template <>
+struct glz::meta<bar_meta> {
+  static constexpr std::string_view name{ "bar_meta" };
+  static constexpr auto value = glz::object("a", &bar_meta::a, "b", &bar_meta::b);
+};

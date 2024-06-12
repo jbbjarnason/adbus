@@ -216,18 +216,14 @@ int main() {
       }
     },
   };
-  "struct"_test = generic_test_case | std::tuple{
-    generic_test{
-      .expected = simple{},
-      .buffer = {
-        42,                                                 // a
-        0,    0,    0,                                      // padding
-        4,    0,    0,    0,    'd',  'b',  'u',  's',  0,  // b
-        0,    0,    0,                                      // padding
-        0x48, 0xe1, 0x7a, 0x14, 0xae, 0xe5, 0x94, 0x40,     // c
-      }
-    }
-  };
+  "struct"_test = generic_test_case | std::tuple{ generic_test{ .expected = simple{},
+                                                                .buffer = {
+                                                                    42,             // a
+                                                                    0,    0,    0,  // padding
+                                                                    4,    0,    0,    0,    'd',  'b',  'u',  's',  0,  // b
+                                                                    0,    0,    0,  // padding
+                                                                    0x48, 0xe1, 0x7a, 0x14, 0xae, 0xe5, 0x94, 0x40,  // c
+                                                                } } };
   "vector of struct"_test = generic_test_case | std::tuple{
     generic_test{
       .expected = std::vector{ foo::bar{ "example1", 67890 }, { "example2", 13579 }, { "example3", 24680 } },
@@ -290,5 +286,17 @@ int main() {
       }
     },
   };
-
+  "non reflectable struct"_test = [] {
+    using value_t = bar_meta;
+    value_t value{ 13 };
+    std::vector<std::uint8_t> buffer{
+      3, 0, 0, 0,              // string length
+      'b', 'a', 'r', 0,        // string
+      13, 0, 0, 0, 0, 0, 0, 0  // int value
+    };
+    auto err = adbus::protocol::read_dbus_binary(value, buffer);
+    expect(!err) << fmt::format("error: {}", err);
+    value_t expected{ 13 };
+    expect(value == expected) << fmt::format("expected: {}, got: {}", expected, value);
+  };
 }
