@@ -214,13 +214,18 @@ struct from_dbus_binary<T> {
     if (ctx.err) [[unlikely]] {
       return;
     }
+    bool found_it{};
     glz::for_each<N>([&](auto I) {
       using V = std::decay_t<std::variant_alternative_t<I, T>>;
       if (read_signature == type::signature_v<V>) {
         variant.template emplace<I>();
         from_dbus_binary<V>::template op<Opts>(std::get<I>(variant), ctx, args...);
+        found_it = true;
       }
     });
+    if (!found_it) [[unlikely]] {
+      ctx.err = error{ error_code::unexpected_variant };
+    }
   }
 };
 

@@ -26,6 +26,7 @@ enum struct error_code : std::uint8_t {
   // read errors
   out_of_range, // if buffer is smaller than the expected input is
   unexpected_enum, // from string
+  unexpected_variant, // Any of the given variant type types do not match the signature from buffer
 };
 
 struct error final {
