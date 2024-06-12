@@ -192,4 +192,29 @@ int main() {
       },
     },
   };
+  "empty vector of vectors"_test = generic_test_case | std::tuple{
+    generic_test{
+      .expected = std::vector<std::vector<std::uint64_t>>{},
+      .buffer = {
+            0, 0, 0, 0,  // size
+      },
+    },
+  };
+  "Non-empty vector of vectors with padding"_test = generic_test_case | std::tuple{
+    generic_test{
+      .expected = std::vector{ std::vector{ 1UL, 2UL }, std::vector{ 3UL, 4UL, 5UL } },
+      .buffer = {
+        0x34, 0x00, 0x00, 0x00,                          // Total length of outer array (52 bytes)
+        0x10, 0x00, 0x00, 0x00,                          // Length of first inner array (16 bytes)
+        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // First element of first inner array
+        0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // Second element of first inner array
+        0x18, 0x00, 0x00, 0x00,                          // Length of second inner array (24 bytes)
+        0x00, 0x00, 0x00, 0x00,                          // Padding to next multiple of 8 bytes
+        0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // First element of second inner array
+        0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // Second element of second inner array
+        0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00   // Third element of second inner array
+      }
+    },
+  };
+
 }
