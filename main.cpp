@@ -8,6 +8,7 @@
 #include <adbus/protocol/message_header.hpp>
 #include <adbus/protocol/methods.hpp>
 #include <adbus/protocol/write.hpp>
+#include <adbus/protocol/read.hpp>
 
 namespace adbus {
 
@@ -118,6 +119,13 @@ public:
         token, socket_);
   }
 
+  auto say_hello(asio::completion_token_for<void(std::error_code, std::string_view)> auto&& token) {
+    auto buffer = std::make_shared<std::string>();
+    auto const header{ protocol::methods::hello() };
+    protocol::write_dbus_binary(header, *buffer);
+
+  }
+
 private:
   // todo windows using generic::stream_protocol::socket
   asio::local::stream_protocol::socket socket_;
@@ -159,9 +167,12 @@ int main() {
     }
     fmt::println("connected\n");
     socket.external_authenticate(
-        [](std::error_code err, std::string_view msg) {
+        [&socket](std::error_code err, std::string_view msg) {
           // todo why does this not work in debug mode not running in debugger?
           fmt::println("auth err {}: msg {}\n", err.message(), msg);
+          socket.say_hello([](std::error_code ec, std::string_view id) {
+            fmt::println("say_hello err {}: msg {}\n", ec.message(), id);
+          });
         });
   });
 

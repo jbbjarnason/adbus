@@ -6,6 +6,7 @@
 
 #include <glaze/concepts/container_concepts.hpp>
 #include <glaze/core/common.hpp>
+#include <glaze/core/reflection_tuple.hpp>
 #include <glaze/util/variant.hpp>
 
 #include <adbus/core/context.hpp>

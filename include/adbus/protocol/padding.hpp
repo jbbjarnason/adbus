@@ -16,6 +16,11 @@ struct padding<T> {
   static constexpr std::size_t value{ sizeof(T) };
 };
 
+template <>
+struct padding<std::byte> {
+  static constexpr std::size_t value{ sizeof(std::byte) };
+};
+
 template <string_like T>
 struct padding<T> {
   static constexpr std::size_t value{ sizeof(std::uint32_t) };
