@@ -19,8 +19,12 @@ using std::string_view_literals::operator""sv;
 using std::string_literals::operator""s;
 
 namespace std {
+template <typename ... Args>
+constexpr auto format_as(variant<Args...> const& var) noexcept -> std::string {
+  return std::visit([](auto&& v) { return fmt::format("{}", v); }, var);
+}
 template<typename first_t, typename second_t>
-constexpr auto format_as(std::pair<const first_t, second_t> v) noexcept -> std::string {
+constexpr auto format_as(pair<const first_t, second_t> const& v) noexcept -> std::string {
   return fmt::format("({}, {})", v.first, v.second);
 }
 template <adbus::container T>
@@ -347,6 +351,18 @@ int main() {
           0,    0,    0,                                        // padding
           0x15, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00        // Value 789 (64-bit)
         }
+    },
+  };
+  using VariantType = std::variant<std::string, int, double>;
+  "variant string"_test = generic_test_case | std::tuple{
+    generic_test{
+        .expected = VariantType { std::string{ "variant" } },
+        .buffer = {
+            1,   's', 0,                          // length of signature + signature for string
+            0,                                    // padding
+            7,   0,   0,   0,                     // string length
+            'v', 'a', 'r', 'i', 'a', 'n', 't', 0  // string content + null terminator
+        },
     },
   };
 }

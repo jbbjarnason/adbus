@@ -5,6 +5,7 @@
 #include <adbus/core/context.hpp>
 #include <adbus/util/concepts.hpp>
 #include <adbus/protocol/padding.hpp>
+#include <adbus/protocol/signature.hpp>
 
 namespace adbus::protocol {
 
@@ -198,6 +199,28 @@ struct from_dbus_binary<T> {
     // I think this is safe in this context, only used currently for maps
     from_dbus_binary<typename T::first_type>::template op<Opts>(const_cast<std::remove_const_t<typename T::first_type>&>(pair.first), args...);
     from_dbus_binary<typename T::second_type>::template op<Opts>(pair.second, args...);
+  }
+};
+
+
+template <glz::is_variant T>
+struct from_dbus_binary<T> {
+  static constexpr auto N = std::variant_size_v<T>;
+
+  template <options Opts>
+  static constexpr void op(auto&& variant, is_context auto&& ctx, auto&&... args) noexcept {
+    type::signature read_signature{};
+    from_dbus_binary<type::signature>::template op<Opts>(read_signature, ctx, args...);
+    if (ctx.err) [[unlikely]] {
+      return;
+    }
+    glz::for_each<N>([&](auto I) {
+      using V = std::decay_t<std::variant_alternative_t<I, T>>;
+      if (read_signature == type::signature_v<V>) {
+        variant.template emplace<I>();
+        from_dbus_binary<V>::template op<Opts>(std::get<I>(variant), ctx, args...);
+      }
+    });
   }
 };
 

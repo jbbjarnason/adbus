@@ -34,6 +34,9 @@ struct signature {
   constexpr auto operator== (const signature& other) const noexcept -> bool {
     return size_ == other.size_ && std::equal(std::begin(data_), std::begin(data_) + size_, std::begin(other.data_));
   }
+  constexpr auto operator== (std::string_view sv) const noexcept -> bool {
+    return size_ == sv.size() && std::equal(std::begin(data_), std::begin(data_) + size_, std::begin(sv));
+  }
   static constexpr auto dbus_signature{ true }; // flag to indicate this is a dbus signature for concept
   std::uint8_t size_{};
   std::array<char, 255> data_{};
