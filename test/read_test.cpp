@@ -310,5 +310,11 @@ int main() {
             0, 0, 0, 0,  // size
         },
     },
+    generic_test{
+        .expected = std::unordered_map<std::string, std::uint64_t>{},
+        .buffer = {
+            0, 0, 0, 0,  // size
+        },
+    },
   };
 }
