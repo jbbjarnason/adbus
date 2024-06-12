@@ -198,10 +198,117 @@ int main() {
   };
   "empty vector of vectors"_test = generic_test_case | std::tuple{
     generic_test{
-      .expected = std::map<std::string, std::uint64_t>{},
-      .buffer = {
-        0, 0, 0, 0,  // size
-      },
+        .expected = std::vector<std::vector<std::uint64_t>>{},
+        .buffer = {
+            0, 0, 0, 0,  // size
+        },
+    },
+  };
+  "Non-empty vector of vectors with padding"_test = generic_test_case | std::tuple{
+    generic_test{
+        .expected = std::vector{ std::vector{ 1UL, 2UL }, std::vector{ 3UL, 4UL, 5UL } },
+        .buffer = {
+            0x34, 0x00, 0x00, 0x00,                          // Total length of outer array (52 bytes)
+            0x10, 0x00, 0x00, 0x00,                          // Length of first inner array (16 bytes)
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // First element of first inner array
+            0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // Second element of first inner array
+            0x18, 0x00, 0x00, 0x00,                          // Length of second inner array (24 bytes)
+            0x00, 0x00, 0x00, 0x00,                          // Padding to next multiple of 8 bytes
+            0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // First element of second inner array
+            0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // Second element of second inner array
+            0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00   // Third element of second inner array
+        }
+    },
+  };
+  "struct"_test = generic_test_case | std::tuple{ generic_test{ .expected = simple{},
+                                                                .buffer = {
+                                                                    42,             // a
+                                                                    0,    0,    0,  // padding
+                                                                    4,    0,    0,    0,    'd',  'b',  'u',  's',  0,  // b
+                                                                    0,    0,    0,  // padding
+                                                                    0x48, 0xe1, 0x7a, 0x14, 0xae, 0xe5, 0x94, 0x40,  // c
+                                                                } } };
+  "vector of struct"_test = generic_test_case | std::tuple{
+    generic_test{
+        .expected = std::vector{ foo::bar{ "example1", 67890 }, { "example2", 13579 }, { "example3", 24680 } },
+        .buffer = {
+            // Vector size
+            76, 0, 0, 0,  // number of elements in vector (little-endian)
+
+            // bars[0] - {"example1", 67890}
+            8, 0, 0, 0,                                      // string length
+            'e', 'x', 'a', 'm', 'p', 'l', 'e', '1', 0,       // string content + null terminator
+            0, 0, 0, 0, 0, 0, 0,                             // + padding
+            0x32, 0x09, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  // 67890 (little-endian)
+
+            // bars[1] - {"example2", 13579}
+            8, 0, 0, 0,                                          // string length
+            'e', 'x', 'a', 'm', 'p', 'l', 'e', '2', 0, 0, 0, 0,  // string content + null terminator + padding
+            0x0B, 0x35, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      // 13579 (little-endian)
+
+            // bars[2] - {"example3", 24680}
+            8, 0, 0, 0,                                          // string length
+            'e', 'x', 'a', 'm', 'p', 'l', 'e', '3', 0, 0, 0, 0,  // string content + null terminator + padding
+            0x68, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      // 24680 (little-endian)
+        }
+    },
+  };
+  "more complex struct"_test = generic_test_case | std::tuple{
+    generic_test{
+        .expected = foo{ .a = 12345, .bars = { { "example1", 67890 }, { "example2", 13579 } }, .bars2 = { { "example3", 24680 } }, .b = "end" },
+        .buffer = {
+            // a
+            0x39, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 12345 (little-endian)
+
+            // bars - vector size
+            52, 0, 0, 0,  // number of elements in vector
+
+            // bars[0] - {"example1", 67890}
+            8, 0, 0, 0,                                      // string length
+            'e', 'x', 'a', 'm', 'p', 'l', 'e', '1', 0,       // string content + null terminator
+            0, 0, 0, 0, 0, 0, 0,                             // + padding
+            0x32, 0x09, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  // 67890 (little-endian)
+
+            // bars[1] - {"example2", 13579}
+            8, 0, 0, 0,                                      // string length
+            'e', 'x', 'a', 'm', 'p', 'l', 'e', '2', 0,       // string content + null terminator
+            0, 0, 0,                                         // + padding
+            0x0B, 0x35, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 13579 (little-endian)
+
+            // bars2 - vector size
+            28, 0, 0, 0,  // number of elements in vector
+
+            // bars2[0] - {"example3", 24680}
+            8, 0, 0, 0,                                      // string length
+            'e', 'x', 'a', 'm', 'p', 'l', 'e', '3', 0,       // string content + null terminator
+            0, 0, 0, 0, 0, 0, 0,                             // + padding
+            0x68, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 24680 (little-endian)
+
+            // b - "end"
+            3, 0, 0, 0,       // string length
+            'e', 'n', 'd', 0  // string content + null terminator
+        }
+    },
+  };
+  "non reflectable struct"_test = [] {
+    using value_t = bar_meta;
+    value_t value{ 13 };
+    std::vector<std::uint8_t> buffer{
+      3, 0, 0, 0,              // string length
+      'b', 'a', 'r', 0,        // string
+      13, 0, 0, 0, 0, 0, 0, 0  // int value
+    };
+    auto err = adbus::protocol::read_dbus_binary(value, buffer);
+    expect(!err) << fmt::format("error: {}", err);
+    value_t expected{ 13 };
+    expect(value == expected) << fmt::format("expected: {}, got: {}", expected, value);
+  };
+  "empty map"_test = generic_test_case | std::tuple{
+    generic_test{
+        .expected = std::map<std::string, std::uint64_t>{},
+        .buffer = {
+            0, 0, 0, 0,  // size
+        },
     },
   };
 }
