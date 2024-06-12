@@ -9,10 +9,15 @@ namespace adbus {
 
 namespace detail {
 
+template <typename T, typename = void>
+struct has_tuple_size : std::false_type {};
+
 template <typename T>
-concept fixed_size = requires {
-  { std::tuple_size_v<T> } -> std::convertible_to<std::size_t>;
-};
+struct has_tuple_size<T, std::void_t<typename std::tuple_size<T>::type>> : std::true_type {};
+
+template <typename T>
+concept fixed_size = has_tuple_size<T>::value &&
+                     std::convertible_to<decltype(std::tuple_size<T>::value), std::size_t>;
 
 }  // namespace detail
 
@@ -39,6 +44,9 @@ concept array_like = detail::fixed_size<T> && glz::detail::accessible<T> && glz:
 
 template <typename T>
 concept container = glz::range<T> && !string_like<T>;
+
+template <class T>
+concept has_clear = requires(T v) { v.clear(); };
 
 namespace type {
 

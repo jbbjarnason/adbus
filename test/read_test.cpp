@@ -29,7 +29,7 @@ constexpr auto format_as(T&& v) noexcept -> std::string {
   str += ']';
   return str;
 }
-}
+}  // namespace std
 
 template <typename T>
 struct generic_test {
@@ -103,10 +103,9 @@ int main() {
 
   using adbus::protocol::type::signature;
   "signature"_test = generic_test_case | std::tuple{
-    generic_test<signature>{
-        .expected = signature{ adbus::protocol::type::signature_v<foo> },
-        .buffer = { signature{ adbus::protocol::type::signature_v<foo> }.size(), '(', 't', 'a', '(', 's', 't', ')', 'a', '(', 's', 't', ')', 's', ')', '\0' }
-    }
+    generic_test<signature>{ .expected = signature{ adbus::protocol::type::signature_v<foo> },
+                             .buffer = { signature{ adbus::protocol::type::signature_v<foo> }.size(), '(', 't', 'a', '(',
+                                         's', 't', ')', 'a', '(', 's', 't', ')', 's', ')', '\0' } }
   };
 
   "vector trivial value_type"_test = generic_test_case | std::tuple{
@@ -132,4 +131,51 @@ int main() {
     },
   };
 
+  "vector of strings"_test = generic_test_case | std::tuple{
+    generic_test{
+      .expected = std::vector{ "bar"s, "baz"s, "foo"s },
+      .buffer = {
+        24, 0, 0, 0,  // size
+        3,  0, 0, 0,  'b', 'a', 'r', '\0',
+        3,  0, 0, 0,  'b', 'a', 'z', '\0',
+        3,  0, 0, 0,  'f', 'o', 'o', '\0',
+      },
+    },
+    generic_test{
+      .expected = std::array{ "bar"s, "baz"s, "foo"s },
+      .buffer = {
+        24, 0, 0, 0,  // size
+        3,  0, 0, 0,  'b', 'a', 'r', '\0',
+        3,  0, 0, 0,  'b', 'a', 'z', '\0',
+        3,  0, 0, 0,  'f', 'o', 'o', '\0',
+      },
+    },
+    generic_test{
+      .expected = std::list{ "bar"s, "baz"s, "foo"s },
+      .buffer = {
+        24, 0, 0, 0,  // size
+        3,  0, 0, 0,  'b', 'a', 'r', '\0',
+        3,  0, 0, 0,  'b', 'a', 'z', '\0',
+        3,  0, 0, 0,  'f', 'o', 'o', '\0',
+      },
+    },
+    generic_test{
+      .expected = std::set{ "bar"s, "baz"s, "foo"s },
+      .buffer = {
+        24, 0, 0, 0,  // size
+        3,  0, 0, 0,  'b', 'a', 'r', '\0',
+        3,  0, 0, 0,  'b', 'a', 'z', '\0',
+        3,  0, 0, 0,  'f', 'o', 'o', '\0',
+      },
+    },
+    generic_test{
+      .expected = std::unordered_set{"foo"s, "baz"s, "bar"s, },
+      .buffer = {
+        24, 0, 0, 0,  // size
+        3,  0, 0, 0,  'b', 'a', 'r', '\0',
+        3,  0, 0, 0,  'b', 'a', 'z', '\0',
+        3,  0, 0, 0,  'f', 'o', 'o', '\0',
+      },
+    },
+  };
 }

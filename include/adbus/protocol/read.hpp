@@ -153,7 +153,10 @@ struct from_dbus_binary<T> {
       return;
     }
     using V = std::decay_t<decltype(value)>;
-    value.clear();
+    if constexpr (has_clear<V>) {
+      value.clear();
+    }
+    std::size_t idx{};
     while (n > 0) {
       typename V::value_type element{};
       auto const beginning_of_element = it;
@@ -162,7 +165,25 @@ struct from_dbus_binary<T> {
         return;
       }
       n -= std::distance(beginning_of_element, it);
-      value.emplace_back(std::move(element));
+      if constexpr (glz::detail::emplace_backable<V>) {
+        value.emplace_back(std::move(element));
+      } else if constexpr (array_like<V>) {
+        // array like, todo support tuple
+        if (idx < std::tuple_size_v<V>) {
+          value[idx] = std::move(element);
+        }
+        else [[unlikely]] {
+          ctx.err = error{ error_code::out_of_range };
+          return;
+        }
+      }
+      else if constexpr (glz::detail::emplaceable<V>) {
+        value.emplace(std::move(element));
+      }
+      else {
+        static_assert(glz::false_v<V>, "unsupported type");
+      }
+      idx++;
     }
     if (n != 0) [[unlikely]] {
       ctx.err = error{ error_code::out_of_range };
