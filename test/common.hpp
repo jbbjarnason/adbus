@@ -49,3 +49,14 @@ struct foo {
   std::string b{};
 };
 
+struct simple {
+  std::uint8_t a{ 42 };
+  std::string b{ "dbus" };
+  double c{ 1337.42 };
+  constexpr auto operator==(simple const&) const noexcept -> bool = default;
+};
+
+constexpr auto format_as(simple const& s) -> std::string {
+  return fmt::format("a: {}, b: {}, c: {}", s.a, s.b, s.c);
+}
+

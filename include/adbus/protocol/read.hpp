@@ -191,6 +191,19 @@ struct from_dbus_binary<T> {
   }
 };
 
+
+template <typename  T>
+  requires(glz::detail::glaze_object_t<T> || glz::detail::reflectable<T>)
+struct from_dbus_binary<T> {
+  static constexpr auto N = glz::reflection_count<T>;
+
+  template <options Opts>
+  static constexpr void op(auto&& value, is_context auto&& ctx, auto&& begin, auto&& it, auto&& end) noexcept {
+    decltype(auto) t = glz::detail::reflection_tuple<T>(value);
+
+  }
+};
+
 }  // namespace detail
 
 template <typename T, typename Buffer>

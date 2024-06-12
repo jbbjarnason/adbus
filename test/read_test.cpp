@@ -216,5 +216,17 @@ int main() {
       }
     },
   };
+  "struct"_test = generic_test_case | std::tuple{
+    generic_test{
+      .expected = simple{},
+      .buffer = {
+        42,                                                 // a
+        0,    0,    0,                                      // padding
+        4,    0,    0,    0,    'd',  'b',  'u',  's',  0,  // b
+        0,    0,    0,                                      // padding
+        0x48, 0xe1, 0x7a, 0x14, 0xae, 0xe5, 0x94, 0x40,     // c
+      }
+    }
+  };
 
 }

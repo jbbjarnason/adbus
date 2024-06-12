@@ -300,11 +300,6 @@ int main() {
   };
 
   "struct"_test = [] {
-    struct simple {
-      std::uint8_t a{ 42 };
-      std::string b{ "dbus" };
-      double c{ 1337.42 };
-    };
     std::string buffer{};
     auto err = write_dbus_binary(simple{}, buffer);
     expect(!err);
