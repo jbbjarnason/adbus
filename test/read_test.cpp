@@ -354,7 +354,7 @@ int main() {
     },
   };
   using VariantType = std::variant<std::string, int, double>;
-  "variant string"_test = generic_test_case | std::tuple{
+  "variant"_test = generic_test_case | std::tuple{
     generic_test{
         .expected = VariantType { std::string{ "variant" } },
         .buffer = {
@@ -363,6 +363,22 @@ int main() {
             7,   0,   0,   0,                     // string length
             'v', 'a', 'r', 'i', 'a', 'n', 't', 0  // string content + null terminator
         },
+    },
+    generic_test{
+      .expected = VariantType { 123456 },
+      .buffer = {
+        1,  'i', 0,    // length of signature + signature for int
+        0,             // padding
+        64, 226, 1, 0  // int value (123456 in little-endian format)
+      },
+    },
+    generic_test{
+      .expected = VariantType { 1337.42 },
+      .buffer = {
+        1,    'd',  0,                                  // length of signature + signature for double
+        0,    0,    0,    0,    0,                      // padding
+        0x48, 0xe1, 0x7a, 0x14, 0xae, 0xe5, 0x94, 0x40  // double value (6.28 in little-endian format)
+      },
     },
   };
 }
