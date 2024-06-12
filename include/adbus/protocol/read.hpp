@@ -198,9 +198,26 @@ struct from_dbus_binary<T> {
   static constexpr auto N = glz::reflection_count<T>;
 
   template <options Opts>
-  static constexpr void op(auto&& value, is_context auto&& ctx, auto&& begin, auto&& it, auto&& end) noexcept {
+  static constexpr void op(auto&& value, auto&&... args) noexcept {
     decltype(auto) t = glz::detail::reflection_tuple<T>(value);
-
+    glz::for_each<N>([&](auto I) {
+      using Element = glz::detail::glaze_tuple_element<I, N, T>;
+      static constexpr size_t member_index = Element::member_index;
+      using val_t = std::remove_cvref_t<typename Element::type>;
+      if constexpr (std::same_as<val_t, glz::hidden> || std::same_as<val_t, glz::skip>) {
+        return;
+      } else {
+        decltype(auto) member = [&]() -> decltype(auto) {
+          if constexpr (glz::detail::reflectable<T>) {
+            return std::get<I>(t);
+          } else {
+            return glz::get<member_index>(glz::get<I>(glz::meta_v<std::decay_t<T>>));
+          }
+        }();
+        auto& member_ref = glz::detail::get_member(value, member);
+        from_dbus_binary<std::decay_t<decltype(member_ref)>>::template op<Opts>(member_ref, args...);
+      }
+    });
   }
 };
 
