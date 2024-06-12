@@ -122,4 +122,14 @@ int main() {
     },
   };
 
+  "empty vector"_test = generic_test_case | std::tuple{
+    generic_test{
+        .expected = std::vector<std::uint64_t>{},
+        .buffer = {
+          0, 0, 0, 0,  // size
+          0, 0, 0, 0,  // padding
+        },
+    },
+  };
+
 }
