@@ -20,6 +20,52 @@ template <typename T>
 struct signature_meta;
 }  // namespace adbus::protocol::type
 
+
+// from https://gitlab.freedesktop.org/dbus/dbus/-/blob/dbus-1.14/dbus/dbus-marshal-header.h?ref_type=heads
+/**
+ * Message header data and some cached details of it.
+ *
+ * A message looks like this:
+ *
+ * @code
+ *  | 0     | 1     | 2     | 3    | 4   | 5   | 6   | 7   | <- index % 8
+ *  |-------|-------|-------|------|-----|-----|-----|-----|
+ *  | Order | Type  | Flags | Vers | Body length           |
+ *  | Serial                       | Fields array length  [A]
+ * [A] Code |Sig.len| Signature + \0           | Content...| <- first field
+ *  | Content ...                  | Pad to 8-byte boundary|
+ *  | Code  |Sig.len| Signature + \0     | Content...      | <- second field
+ * ...
+ *  | Code  |Sig.len| Signature    | Content...            | <- last field
+ *  | Content ...  [B] Padding to 8-byte boundary         [C]
+ * [C] Body ...                                            |
+ * ...
+ *  | Body ...              [D]           <- no padding after natural length
+ * @endcode
+ *
+ * Each field is a struct<byte,variant>. All structs have 8-byte alignment,
+ * so each field is preceded by 0-7 bytes of padding to an 8-byte boundary
+ * (for the first field it happens to be 0 bytes). The overall header
+ * is followed by 0-7 bytes of padding to align the body.
+ *
+ * Key to content, with variable name references for _dbus_header_load():
+ *
+ * Order: byte order, currently 'l' or 'B' (byte_order)
+ * Type: message type such as DBUS_MESSAGE_TYPE_METHOD_CALL
+ * Flags: message flags such as DBUS_HEADER_FLAG_NO_REPLY_EXPECTED
+ * Vers: D-Bus wire protocol version, currently always 1
+ * Body length: Distance from [C] to [D]
+ * Serial: Message serial number
+ * Fields array length: Distance from [A] to [B] (fields_array_len)
+ *
+ * To understand _dbus_header_load():
+ *
+ * [A] is FIRST_FIELD_OFFSET.
+ * header_len is from 0 to [C].
+ * padding_start is [B].
+ * padding_len is the padding from [B] to [C].
+ */
+
 namespace adbus::protocol::header {
 
 namespace details {
