@@ -178,6 +178,22 @@ struct header {
 }  // namespace adbus::protocol
 
 template <>
+struct glz::meta<adbus::protocol::header::header> {
+  using T = adbus::protocol::header::header;
+  static constexpr auto value{ glz::object(
+    "endian", &T::endian,
+    "type", &T::type,
+    "flags", [](auto&& self) -> auto& {
+      return *reinterpret_cast<const std::uint8_t*>(&self.flags);
+    },
+    "version", &T::version,
+    "body_length", &T::body_length,
+    "serial", &T::serial,
+    "fields", &T::fields
+  )};
+};
+
+template <>
 struct adbus::protocol::type::signature_meta<adbus::protocol::header::flags_t> {
   static constexpr std::string_view value{ "y" };
 };

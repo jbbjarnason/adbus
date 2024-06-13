@@ -23,5 +23,5 @@ target_link_libraries(path_test.cpp PRIVATE adbus::adbus)
 add_test(NAME path_test COMMAND path_test)
 
 add_executable(message_header_test message_header_test.cpp)
-target_link_libraries(message_header_test PRIVATE adbus::adbus)
+target_link_libraries(message_header_test PRIVATE adbus::adbus Boost::ut)
 add_test(NAME message_header_test COMMAND message_header_test)

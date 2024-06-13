@@ -6,6 +6,7 @@
 #include <array>
 #include <cassert>
 
+#include <glaze/util/type_traits.hpp>
 #include <glaze/core/common.hpp>
 #include <glaze/core/meta.hpp>
 #include <glaze/reflection/to_tuple.hpp>

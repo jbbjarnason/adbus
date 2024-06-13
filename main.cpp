@@ -4,11 +4,11 @@
 #include <fmt/format.h>
 #include <boost/asio.hpp>
 
-#include <adbus/protocol/signature.hpp>
 #include <adbus/protocol/message_header.hpp>
 #include <adbus/protocol/methods.hpp>
-#include <adbus/protocol/write.hpp>
 #include <adbus/protocol/read.hpp>
+#include <adbus/protocol/signature.hpp>
+#include <adbus/protocol/write.hpp>
 
 namespace adbus {
 
@@ -88,8 +88,8 @@ public:
     return asio::async_compose<completion_token_t, void(std::error_code, std::string_view)>(
         [this, state = state_e::send_auth,
          auth{ fmt::format("{} {} {}{}", auth_command, auth_mechanism, user_id_hex, line_ending) },
-         recv_buffer{ std::make_shared<std::array<char, 1024>>() }, recv_view{""sv}](auto& self, std::error_code err = {},
-                                                                    std::size_t size = 0) mutable -> void {
+         recv_buffer{ std::make_shared<std::array<char, 1024>>() },
+         recv_view{ ""sv }](auto& self, std::error_code err = {}, std::size_t size = 0) mutable -> void {
           if (err) {
             return self.complete(err, {});
           }
@@ -123,7 +123,25 @@ public:
     auto buffer = std::make_shared<std::string>();
     auto const header{ protocol::methods::hello() };
     protocol::write_dbus_binary(header, *buffer);
-
+    enum struct state_e : std::uint8_t { send_hello, recv_my_name, complete };
+    return asio::async_compose<decltype(token), void(std::error_code, std::string_view)>(
+        [this, buffer{ std::move(buffer) }, state{ state_e::send_hello }, recv_buffer{ std::make_shared<std::array<char, 1024>>() }](auto& self, std::error_code err = {}, std::size_t size = 0) mutable -> void {
+          if (err) {
+            return self.complete(err, {});
+          }
+          if (state == state_e::send_hello) {
+            state = state_e::recv_my_name;
+            return socket_.async_write_some(asio::buffer(*buffer), std::move(self));
+          }
+          else if (state == state_e::recv_my_name) {
+            state = state_e::complete;
+            return socket_.async_read_some(asio::buffer(*recv_buffer), std::move(self));
+          }
+          else {
+            return self.complete(err, {recv_buffer->data(), size});
+          }
+        },
+        token, socket_);
   }
 
 private:
@@ -143,7 +161,7 @@ namespace detail {
 static constexpr std::string_view unix_path_prefix{ "unix:path=" };
 }
 
-}  // namespace boost::asio::dbus
+}  // namespace adbus
 
 namespace asio = boost::asio;
 using std::string_view_literals::operator""sv;
@@ -166,14 +184,12 @@ int main() {
       return;
     }
     fmt::println("connected\n");
-    socket.external_authenticate(
-        [&socket](std::error_code err, std::string_view msg) {
-          // todo why does this not work in debug mode not running in debugger?
-          fmt::println("auth err {}: msg {}\n", err.message(), msg);
-          socket.say_hello([](std::error_code ec, std::string_view id) {
-            fmt::println("say_hello err {}: msg {}\n", ec.message(), id);
-          });
-        });
+    socket.external_authenticate([&socket](std::error_code err, std::string_view msg) {
+      // todo why does this not work in debug mode not running in debugger?
+      fmt::println("auth err {}: msg {}\n", err.message(), msg);
+      socket.say_hello(
+          [](std::error_code ec, std::string_view id) { fmt::println("say_hello err {}: msg {}\n", ec.message(), id); });
+    });
   });
 
   ctx.run();

@@ -11,6 +11,7 @@
 
 #include <adbus/protocol/signature.hpp>
 #include <adbus/protocol/write.hpp>
+#include <adbus/protocol/methods.hpp>
 
 #include "common.hpp"
 
@@ -506,6 +507,16 @@ int main() {
       0,    0,    0,    0,    0,                      // padding
       0x48, 0xe1, 0x7a, 0x14, 0xae, 0xe5, 0x94, 0x40  // double value (6.28 in little-endian format)
     };
+    expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
+    expect(std::equal(buffer.begin(), buffer.end(), compare.begin(), compare.end(), uint8_cmp));
+  };
+
+  "method hello"_test = [] {
+    std::string buffer{};
+    auto hello = adbus::protocol::methods::hello();
+    auto err = write_dbus_binary(hello, buffer);
+    expect(!err);
+    std::string_view compare = "l\001\000\001\000\000\000\000\001\000\000\000n\000\000\000\001\001o\000\025\000\000\000/org/freedesktop/DBus\000\000\000\006\001s\000\024\000\000\000org.freedesktop.DBus\000\000\000\000\002\001s\000\024\000\000\000org.freedesktop.DBus\000\000\000\000\003\001s\000\005\000\000\000Hello\000\000";
     expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
     expect(std::equal(buffer.begin(), buffer.end(), compare.begin(), compare.end(), uint8_cmp));
   };
