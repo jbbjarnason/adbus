@@ -516,7 +516,28 @@ int main() {
     auto hello = adbus::protocol::methods::hello();
     auto err = write_dbus_binary(hello, buffer);
     expect(!err);
-    std::string_view compare = "l\001\000\001\000\000\000\000\001\000\000\000n\000\000\000\001\001o\000\025\000\000\000/org/freedesktop/DBus\000\000\000\006\001s\000\024\000\000\000org.freedesktop.DBus\000\000\000\000\002\001s\000\024\000\000\000org.freedesktop.DBus\000\000\000\000\003\001s\000\005\000\000\000Hello\000\000";
+//    std::string_view compare = "l\001\000\001\000\000\000\000\001\000\000\000n\000\000\000\001\001o\000\025\000\000\000/org/freedesktop/DBus\000\000\000\006\001s\000\024\000\000\000org.freedesktop.DBus\000\000\000\000\002\001s\000\024\000\000\000org.freedesktop.DBus\000\000\000\000\003\001s\000\005\000\000\000Hello\000\000";
+    'l',001,000,001,000,000,000,000,001,000,000,000,'n',000,000,000,001,001o,000,025,000,000,000/org/freedesktop/DBus,000,000,000,006,001s,000,024,000,000,000org.freedesktop.DBus,000,000,000,000,002,001s,000,024,000,000,000org.freedesktop.DBus,000,000,000,000,003,001s,000,005,000,000,000Hello,000,000
+    std::vector<std::uint8_t> compare = {
+      'l', // endian
+      1, // message type method call
+      0, // flags none
+      1, // version 1
+      0, 0, 0, 0, // body length
+      1, 0, 0, 0, // serial of this message
+      // vector of fields
+      // todo where is the size of the vector
+      'n', // std::int16_t
+      0, 0,  // value
+      0, 1, 1, 'o', 0,
+      // path
+      25, 0, 0, 0, // lengths
+      '/', 'o', 'r', 'g', '/', 'f', 'r', 'e', 'e', 'd', 'e', 's', 'k', 't', 'o', 'p', '/', 'D', 'B', 'u', 's', 0,
+      0, 0, // padding
+      6, 1, 's', 0, 24, 0, 0, 0, 'o', 'r', 'g', '.', 'f', 'r', 'e', 'e', 'd', 'e', 's', 'k', 't', 'o', 'p', '.', 'D', 'B', 'u', 's', 0, 0, 0, 0,
+      2, 1, 's', 0, 24, 0, 0, 0, 'o', 'r', 'g', '.', 'f', 'r', 'e', 'e', 'd', 'e', 's', 'k', 't', 'o', 'p', '.', 'D', 'B', 'u', 's', 0, 0, 0, 0,
+      3, 1, 's', 0, 5, 0, 0, 0, 'H', 'e', 'l', 'l', 'o', 0, 0
+    };
     expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
     expect(std::equal(buffer.begin(), buffer.end(), compare.begin(), compare.end(), uint8_cmp));
   };
