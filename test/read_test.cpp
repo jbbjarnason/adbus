@@ -19,11 +19,11 @@ using std::string_view_literals::operator""sv;
 using std::string_literals::operator""s;
 
 namespace std {
-template <typename ... Args>
+template <typename... Args>
 constexpr auto format_as(variant<Args...> const& var) noexcept -> std::string {
   return std::visit([](auto&& v) { return fmt::format("{}", v); }, var);
 }
-template<typename first_t, typename second_t>
+template <typename first_t, typename second_t>
 constexpr auto format_as(pair<const first_t, second_t> const& v) noexcept -> std::string {
   return fmt::format("({}, {})", v.first, v.second);
 }
@@ -236,24 +236,25 @@ int main() {
     generic_test{
         .expected = std::vector{ foo::bar{ "example1", 67890 }, { "example2", 13579 }, { "example3", 24680 } },
         .buffer = {
-            // Vector size
-            76, 0, 0, 0,  // number of elements in vector (little-endian)
+          // Vector size
+          76, 0, 0, 0,  // number of elements in vector (little-endian)
+          0, 0, 0, 0,   // padding
 
-            // bars[0] - {"example1", 67890}
-            8, 0, 0, 0,                                      // string length
-            'e', 'x', 'a', 'm', 'p', 'l', 'e', '1', 0,       // string content + null terminator
-            0, 0, 0, 0, 0, 0, 0,                             // + padding
-            0x32, 0x09, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  // 67890 (little-endian)
+          // bars[0] - {"example1", 67890}
+          8, 0, 0, 0,                                      // string length
+          'e', 'x', 'a', 'm', 'p', 'l', 'e', '1', 0,       // string content + null terminator
+          0, 0, 0,                                         // + padding
+          0x32, 0x09, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  // 67890 (little-endian)
 
-            // bars[1] - {"example2", 13579}
-            8, 0, 0, 0,                                          // string length
-            'e', 'x', 'a', 'm', 'p', 'l', 'e', '2', 0, 0, 0, 0,  // string content + null terminator + padding
-            0x0B, 0x35, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      // 13579 (little-endian)
+          // bars[1] - {"example2", 13579}
+          8, 0, 0, 0,                                          // string length
+          'e', 'x', 'a', 'm', 'p', 'l', 'e', '2', 0, 0, 0, 0,  // string content + null terminator + padding
+          0x0B, 0x35, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      // 13579 (little-endian)
 
-            // bars[2] - {"example3", 24680}
-            8, 0, 0, 0,                                          // string length
-            'e', 'x', 'a', 'm', 'p', 'l', 'e', '3', 0, 0, 0, 0,  // string content + null terminator + padding
-            0x68, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      // 24680 (little-endian)
+          // bars[2] - {"example3", 24680}
+          8, 0, 0, 0,                                          // string length
+          'e', 'x', 'a', 'm', 'p', 'l', 'e', '3', 0, 0, 0, 0,  // string content + null terminator + padding
+          0x68, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      // 24680 (little-endian)
         }
     },
   };
@@ -261,36 +262,40 @@ int main() {
     generic_test{
         .expected = foo{ .a = 12345, .bars = { { "example1", 67890 }, { "example2", 13579 } }, .bars2 = { { "example3", 24680 } }, .b = "end" },
         .buffer = {
-            // a
-            0x39, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 12345 (little-endian)
+          // a
+          0x39, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 12345 (little-endian)
 
-            // bars - vector size
-            52, 0, 0, 0,  // number of elements in vector
+          // bars - vector size
+          52, 0, 0, 0,  // number of elements in vector
 
-            // bars[0] - {"example1", 67890}
-            8, 0, 0, 0,                                      // string length
-            'e', 'x', 'a', 'm', 'p', 'l', 'e', '1', 0,       // string content + null terminator
-            0, 0, 0, 0, 0, 0, 0,                             // + padding
-            0x32, 0x09, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  // 67890 (little-endian)
+          0, 0, 0, 0,  // padding
 
-            // bars[1] - {"example2", 13579}
-            8, 0, 0, 0,                                      // string length
-            'e', 'x', 'a', 'm', 'p', 'l', 'e', '2', 0,       // string content + null terminator
-            0, 0, 0,                                         // + padding
-            0x0B, 0x35, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 13579 (little-endian)
+          // bars[0] - {"example1", 67890}
+          8, 0, 0, 0,                                      // string length
+          'e', 'x', 'a', 'm', 'p', 'l', 'e', '1', 0,       // string content + null terminator
+          0, 0, 0,                                         // + padding
+          0x32, 0x09, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  // 67890 (little-endian)
 
-            // bars2 - vector size
-            28, 0, 0, 0,  // number of elements in vector
+          // bars[1] - {"example2", 13579}
+          8, 0, 0, 0,                                      // string length
+          'e', 'x', 'a', 'm', 'p', 'l', 'e', '2', 0,       // string content + null terminator
+          0, 0, 0,                                         // + padding
+          0x0B, 0x35, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 13579 (little-endian)
 
-            // bars2[0] - {"example3", 24680}
-            8, 0, 0, 0,                                      // string length
-            'e', 'x', 'a', 'm', 'p', 'l', 'e', '3', 0,       // string content + null terminator
-            0, 0, 0, 0, 0, 0, 0,                             // + padding
-            0x68, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 24680 (little-endian)
+          // bars2 - vector size
+          28, 0, 0, 0,  // number of elements in vector
 
-            // b - "end"
-            3, 0, 0, 0,       // string length
-            'e', 'n', 'd', 0  // string content + null terminator
+          0, 0, 0, 0,  // padding
+
+          // bars2[0] - {"example3", 24680}
+          8, 0, 0, 0,                                      // string length
+          'e', 'x', 'a', 'm', 'p', 'l', 'e', '3', 0,       // string content + null terminator
+          0, 0, 0,                                         // + padding
+          0x68, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 24680 (little-endian)
+
+          // b - "end"
+          3, 0, 0, 0,       // string length
+          'e', 'n', 'd', 0  // string content + null terminator
         }
     },
   };
@@ -298,9 +303,9 @@ int main() {
     using value_t = bar_meta;
     value_t value{ 13 };
     std::vector<std::uint8_t> buffer{
-      3, 0, 0, 0,              // string length
-      'b', 'a', 'r', 0,        // string
-      13, 0, 0, 0, 0, 0, 0, 0  // int value
+      3,   0,   0,   0,             // string length
+      'b', 'a', 'r', 0,             // string
+      13,  0,   0,   0, 0, 0, 0, 0  // int value
     };
     auto err = adbus::protocol::read_dbus_binary(value, buffer);
     expect(!err) << fmt::format("error: {}", err);
@@ -324,32 +329,35 @@ int main() {
   "map"_test = generic_test_case | std::tuple{
     generic_test{ .expected = std::map<std::string, std::uint64_t>{ { "key1", 123 }, { "key2", 456 } },
                   .buffer = {
-                      44, 0x00, 0x00, 0x00,  // Length of the array (44 bytes)
-                      // First entry
-                      0x04, 0x00, 0x00, 0x00,                          // Length of the string key1 (4 bytes)
-                      'k', 'e', 'y', '1', 0x00,                        // key1
-                      0, 0, 0,                                         // padding
-                      0x7B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // Value 123 (64-bit)
-                      // Second entry
-                      0x04, 0x00, 0x00, 0x00,                         // Length of the string key2 (4 bytes)
-                      'k', 'e', 'y', '2', 0x00,                       // key2
-                      0, 0, 0, 0, 0, 0, 0,                            // padding
-                      0xC8, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00  // Value 456 (64-bit)
+      52, 0x00, 0x00, 0x00,  // Length of the array (52 bytes)
+      0, 0, 0, 0,            // padding
+      // First entry
+      0x04, 0x00, 0x00, 0x00,                          // Length of the string key1 (4 bytes)
+      'k', 'e', 'y', '1', 0x00,                        // key1
+      0, 0, 0, 0, 0, 0, 0,                             // padding
+      0x7B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // Value 123 (64-bit)
+      // Second entry
+      0x04, 0x00, 0x00, 0x00,                         // Length of the string key2 (4 bytes)
+      'k', 'e', 'y', '2', 0x00,                       // key2
+      0, 0, 0, 0, 0, 0, 0,                            // padding
+      0xC8, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00  // Value 456 (64-bit)
                   } },
   };
   "Map of maps"_test = generic_test_case | std::tuple{
     generic_test{
       .expected = std::map<std::string, std::map<std::string, std::uint64_t>>{ { "outerKey", { { "innerKey", 789 } } } },
       .buffer = {
-          44,   0x00, 0x00, 0x00,                               // Length of the outer array (44 bytes)
-          0x08, 0x00, 0x00, 0x00,                               // Length of the string outerKey
-          'o',  'u',  't',  'e',  'r',  'K',  'e',  'y', 0x00,  // outerKey
-          0,    0,    0,                                        // padding
-          24,   0x00, 0x00, 0x00,                               // Length of the inner array (24 bytes)
-          0x08, 0x00, 0x00, 0x00,                               // Length of the string innerKey
-          'i',  'n',  'n',  'e',  'r',  'K',  'e',  'y', 0x00,  // innerKey
-          0,    0,    0,                                        // padding
-          0x15, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00        // Value 789 (64-bit)
+        52,   0x00, 0x00, 0x00,                               // Length of the outer array (52 bytes)
+        0,    0,    0,    0,                                  // padding
+        0x08, 0x00, 0x00, 0x00,                               // Length of the string outerKey
+        'o',  'u',  't',  'e',  'r',  'K',  'e',  'y', 0x00,  // outerKey
+        0,    0,    0,                                        // padding
+        28,   0x00, 0x00, 0x00,                               // Length of the inner array (24 bytes)
+        0,    0,    0,    0,                                  // padding
+        0x08, 0x00, 0x00, 0x00,                               // Length of the string innerKey
+        'i',  'n',  'n',  'e',  'r',  'K',  'e',  'y', 0x00,  // innerKey
+        0,    0,    0,                                        // padding
+        0x15, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00        // Value 789 (64-bit)
         }
     },
   };
