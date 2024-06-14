@@ -257,8 +257,10 @@ struct to_dbus_binary<T> {
 
   // mostly copied from glaze binary/write.hpp
   template <options Opts>
-  static constexpr void op(auto&& value, auto&&... args) noexcept {
+  static constexpr void op(auto&& value, is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
     decltype(auto) t = glz::detail::reflection_tuple<T>(value);
+    // A struct must start on an 8-byte boundary regardless of the type of the struct fields
+    pad<std::uint64_t>(buffer, idx);
     glz::for_each<N>([&](auto I) {
       using Element = glz::detail::glaze_tuple_element<I, N, T>;
       static constexpr size_t member_index = Element::member_index;
@@ -274,7 +276,7 @@ struct to_dbus_binary<T> {
           }
         }();
         auto& member_ref = glz::detail::get_member(value, member);
-        to_dbus_binary<std::decay_t<decltype(member_ref)>>::template op<Opts>(member_ref, args...);
+        to_dbus_binary<std::decay_t<decltype(member_ref)>>::template op<Opts>(member_ref, ctx, buffer, idx);
       }
     });
   }

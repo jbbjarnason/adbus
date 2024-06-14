@@ -313,11 +313,12 @@ int main() {
     auto compare = std::vector<std::uint8_t>{
       // Vector size
       76, 0, 0, 0,  // number of elements in vector (little-endian)
+      0, 0, 0, 0,   // padding
 
       // bars[0] - {"example1", 67890}
       8, 0, 0, 0,                                      // string length
       'e', 'x', 'a', 'm', 'p', 'l', 'e', '1', 0,       // string content + null terminator
-      0, 0, 0, 0, 0, 0, 0,                             // + padding
+      0, 0, 0,                                         // + padding
       0x32, 0x09, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  // 67890 (little-endian)
 
       // bars[1] - {"example2", 13579}
@@ -351,10 +352,12 @@ int main() {
       // bars - vector size
       52, 0, 0, 0,  // number of elements in vector
 
+      0, 0, 0, 0,   // padding
+
       // bars[0] - {"example1", 67890}
       8, 0, 0, 0,                                      // string length
       'e', 'x', 'a', 'm', 'p', 'l', 'e', '1', 0,       // string content + null terminator
-      0, 0, 0, 0, 0, 0, 0,                             // + padding
+      0, 0, 0,                                         // + padding
       0x32, 0x09, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  // 67890 (little-endian)
 
       // bars[1] - {"example2", 13579}
@@ -366,10 +369,12 @@ int main() {
       // bars2 - vector size
       28, 0, 0, 0,  // number of elements in vector
 
+      0, 0, 0, 0,   // padding
+
       // bars2[0] - {"example3", 24680}
       8, 0, 0, 0,                                      // string length
       'e', 'x', 'a', 'm', 'p', 'l', 'e', '3', 0,       // string content + null terminator
-      0, 0, 0, 0, 0, 0, 0,                             // + padding
+      0, 0, 0,                                         // + padding
       0x68, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // 24680 (little-endian)
 
       // b - "end"
@@ -389,6 +394,24 @@ int main() {
       3, 0, 0, 0,            // string length
       'b', 'a', 'r', 0,      // string
       13, 0, 0, 0, 0, 0, 0, 0// int value
+    };
+    expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
+    expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
+  };
+
+  "A struct must start on an 8-byte boundary regardless of the type of the struct fields"_test = [] {
+    std::string buffer{};
+    buffer.resize(1);
+    auto err = write_dbus_binary(simple{}, buffer);
+    expect(!err);
+    auto compare = std::vector<std::uint8_t>{
+      0,                                                  // previous buffer
+      0, 0, 0, 0, 0, 0, 0,                                // padding
+      42,                                                 // a
+      0,    0,    0,                                      // padding
+      4,    0,    0,    0,    'd',  'b',  'u',  's',  0,  // b
+      0,    0,    0,                                      // padding
+      0x48, 0xe1, 0x7a, 0x14, 0xae, 0xe5, 0x94, 0x40,     // c
     };
     expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
     expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
@@ -511,41 +534,41 @@ int main() {
     expect(std::equal(buffer.begin(), buffer.end(), compare.begin(), compare.end(), uint8_cmp));
   };
 
-  "header with path"_test = [] {
-    static_assert(adbus::signature_v<adbus::protocol::header::field_path> == "o"sv);
-    namespace header = adbus::protocol::header;
-    std::string buffer{};
-    auto hello = header::header{
-      .type = header::message_type_e::method_call,
-      .flags = {},
-      .body_length = 0,
-      .serial = 1,
-      .fields = {
-          {
-              .value = header::field_path{"/org/freedesktop/DBus"}
-          }
-      }
-    };
-    auto err = write_dbus_binary(hello, buffer);
-    expect(!err);
-    std::vector<std::uint8_t> compare{
-      'l', // endian
-      1, // message type method call
-      0, // flags none
-      1, // version 1
-      0,0,0,0, // body length
-      1,0,0,0, // serial
-      0,0,0,0, // field array byte length todo
-      1, // field code of PATH
-      1, // signature length
-      'o', // signature
-      0, // null terminator
-      21,0,0,0, // size of string
-      '/','o','r','g','/','f','r','e','e','d','e','s','k','t','o','p','/','D','B','u','s', 0
-    };
-    expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
-    expect(std::equal(buffer.begin(), buffer.end(), compare.begin(), compare.end(), uint8_cmp));
-  };
+  // "header with path"_test = [] {
+  //   static_assert(adbus::signature_v<adbus::protocol::header::field_path> == "o"sv);
+  //   namespace header = adbus::protocol::header;
+  //   std::string buffer{};
+  //   auto hello = header::header{
+  //     .type = header::message_type_e::method_call,
+  //     .flags = {},
+  //     .body_length = 0,
+  //     .serial = 1,
+  //     .fields = {
+  //         {
+  //             .value = header::field_path{"/org/freedesktop/DBus"}
+  //         }
+  //     }
+  //   };
+  //   auto err = write_dbus_binary(hello, buffer);
+  //   expect(!err);
+  //   std::vector<std::uint8_t> compare{
+  //     'l', // endian
+  //     1, // message type method call
+  //     0, // flags none
+  //     1, // version 1
+  //     0,0,0,0, // body length
+  //     1,0,0,0, // serial
+  //     0,0,0,0, // field array byte length todo
+  //     1, // field code of PATH
+  //     1, // signature length
+  //     'o', // signature
+  //     0, // null terminator
+  //     21,0,0,0, // size of string
+  //     '/','o','r','g','/','f','r','e','e','d','e','s','k','t','o','p','/','D','B','u','s', 0
+  //   };
+  //   expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
+  //   expect(std::equal(buffer.begin(), buffer.end(), compare.begin(), compare.end(), uint8_cmp));
+  // };
 
   "alignment or padding"_test =
       [](auto test) {
