@@ -9,9 +9,9 @@
 #include <set>
 #include <unordered_set>
 
+#include <adbus/protocol/methods.hpp>
 #include <adbus/protocol/signature.hpp>
 #include <adbus/protocol/write.hpp>
-#include <adbus/protocol/methods.hpp>
 
 #include "common.hpp"
 
@@ -352,7 +352,7 @@ int main() {
       // bars - vector size
       52, 0, 0, 0,  // number of elements in vector
 
-      0, 0, 0, 0,   // padding
+      0, 0, 0, 0,  // padding
 
       // bars[0] - {"example1", 67890}
       8, 0, 0, 0,                                      // string length
@@ -369,7 +369,7 @@ int main() {
       // bars2 - vector size
       28, 0, 0, 0,  // number of elements in vector
 
-      0, 0, 0, 0,   // padding
+      0, 0, 0, 0,  // padding
 
       // bars2[0] - {"example3", 24680}
       8, 0, 0, 0,                                      // string length
@@ -390,10 +390,11 @@ int main() {
     std::string buffer{};
     auto err = write_dbus_binary(bar_meta{ 13 }, buffer);
     expect(!err);
-    auto compare = std::vector<std::uint8_t>{ //
-      3, 0, 0, 0,            // string length
-      'b', 'a', 'r', 0,      // string
-      13, 0, 0, 0, 0, 0, 0, 0// int value
+    auto compare = std::vector<std::uint8_t>{
+      //
+      3,   0,   0,   0,             // string length
+      'b', 'a', 'r', 0,             // string
+      13,  0,   0,   0, 0, 0, 0, 0  // int value
     };
     expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
     expect(std::equal(buffer.begin(), buffer.end(), std::begin(compare), std::end(compare), uint8_cmp));
@@ -406,7 +407,7 @@ int main() {
     expect(!err);
     auto compare = std::vector<std::uint8_t>{
       0,                                                  // previous buffer
-      0, 0, 0, 0, 0, 0, 0,                                // padding
+      0,    0,    0,    0,    0,    0,    0,              // padding
       42,                                                 // a
       0,    0,    0,                                      // padding
       4,    0,    0,    0,    'd',  'b',  'u',  's',  0,  // b
@@ -438,11 +439,12 @@ int main() {
 
         // Example marshaled data
         auto compare = std::vector<std::uint8_t>{
-          44, 0x00, 0x00, 0x00,  // Length of the array (44 bytes)
+          52, 0x00, 0x00, 0x00,  // Length of the array (52 bytes)
+          0, 0, 0, 0,            // padding
           // First entry
           0x04, 0x00, 0x00, 0x00,                          // Length of the string key1 (4 bytes)
           'k', 'e', 'y', '1', 0x00,                        // key1
-          0, 0, 0,                                         // padding
+          0, 0, 0, 0, 0, 0, 0,                             // padding
           0x7B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // Value 123 (64-bit)
           // Second entry
           0x04, 0x00, 0x00, 0x00,                         // Length of the string key2 (4 bytes)
@@ -467,11 +469,13 @@ int main() {
 
     // Example marshaled data
     auto compare = std::vector<std::uint8_t>{
-      44,   0x00, 0x00, 0x00,                               // Length of the outer array (44 bytes)
+      52,   0x00, 0x00, 0x00,                               // Length of the outer array (52 bytes)
+      0,    0,    0,    0,                                  // padding
       0x08, 0x00, 0x00, 0x00,                               // Length of the string outerKey
       'o',  'u',  't',  'e',  'r',  'K',  'e',  'y', 0x00,  // outerKey
       0,    0,    0,                                        // padding
-      24,   0x00, 0x00, 0x00,                               // Length of the inner array (24 bytes)
+      28,   0x00, 0x00, 0x00,                               // Length of the inner array (24 bytes)
+      0,    0,    0,    0,                                  // padding
       0x08, 0x00, 0x00, 0x00,                               // Length of the string innerKey
       'i',  'n',  'n',  'e',  'r',  'K',  'e',  'y', 0x00,  // innerKey
       0,    0,    0,                                        // padding

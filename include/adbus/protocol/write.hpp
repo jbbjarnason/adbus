@@ -230,10 +230,13 @@ struct to_dbus_binary<T> {
 template <glz::detail::pair_t T>
 struct to_dbus_binary<T> {
   template <options Opts>
-  static constexpr void op(auto&& pair, auto&&... args) noexcept {
+  static constexpr void op(auto&& pair, [[maybe_unused]] is_context auto&& ctx, auto&&... args) noexcept {
+    // A struct must start on an 8-byte boundary regardless of the type of the struct fields.
+    // DICT_ENTRY          Identical to STRUCT.
+    pad<std::uint64_t>(args...);
     const auto& [key, value]{ pair };
-    to_dbus_binary<typename T::first_type>::template op<Opts>(key, args...);
-    to_dbus_binary<typename T::second_type>::template op<Opts>(value, args...);
+    to_dbus_binary<typename T::first_type>::template op<Opts>(key, ctx, args...);
+    to_dbus_binary<typename T::second_type>::template op<Opts>(value, ctx, args...);
   }
 };
 
