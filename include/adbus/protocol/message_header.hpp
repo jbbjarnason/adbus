@@ -181,15 +181,14 @@ using field_signature = header_field<std::byte{ 8 }, std::string>;
 using field_unix_fds = header_field<std::byte{ 9 }, std::uint32_t>;
 
 struct field {
-  // field(auto&& in_place_type, auto&& val) : code{ make_code(variant_t{in_place_type}) }, value{ in_place_type, std::forward<decltype(val)>(val) } {}
+  field(auto&& one_of_variant_t) : code{ make_code(one_of_variant_t) }, value{ std::forward<decltype(one_of_variant_t)>(one_of_variant_t) } {}
   using variant_t = std::variant<field_path, field_interface, field_member, field_error_name, field_reply_serial, field_destination, field_sender, field_signature, field_unix_fds>;
-  const std::byte code{};
+  const std::byte code;
   variant_t value;
 private:
-  static constexpr auto make_code(variant_t&& val) -> std::byte {
-    return std::visit([]<typename value_t>(value_t&&) -> std::byte {
-      return std::decay_t<value_t>::code;
-    }, val);
+  template <class T>
+  static constexpr auto make_code(T&&) -> std::byte {
+    return std::decay_t<T>::code;
   }
 };
 
@@ -231,6 +230,15 @@ struct glz::meta<adbus::protocol::header::header_field<code_v, variant_t, requir
 };
 
 template <>
+struct glz::meta<adbus::protocol::header::field> {
+  using T = adbus::protocol::header::field;
+  static constexpr auto value{ glz::object(
+    "code", &T::code,
+    "value", &T::value
+  )};
+};
+
+template <>
 struct glz::meta<adbus::protocol::header::header> {
   using T = adbus::protocol::header::header;
   static constexpr auto value{ glz::object(
@@ -244,14 +252,4 @@ struct glz::meta<adbus::protocol::header::header> {
     "serial", &T::serial,
     "fields", &T::fields
   )};
-};
-
-template <>
-struct adbus::protocol::type::signature_meta<adbus::protocol::header::flags_t> {
-  static constexpr std::string_view value{ "y" };
-};
-
-template <>
-struct adbus::protocol::type::signature_meta<adbus::protocol::header::field> {
-  static constexpr std::string_view value{ "(yv)" };
 };

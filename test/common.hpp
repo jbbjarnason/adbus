@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+
+#include <fmt/format.h>
 #include <glaze/core/common.hpp>
 
 enum struct enum_as_number : std::uint8_t {

@@ -12,19 +12,19 @@ auto hello() -> protocol::header::header {
     .serial = 1,
     .fields = {
       {
-        .value = field_destination{"org.freedesktop.DBus"}
+        field_destination{"org.freedesktop.DBus"}
       },
       {
-        .value = field_path{"/org/freedesktop/DBus"}
+        field_path{path::make("/org/freedesktop/DBus").value()}
       },
       {
-        .value = field_interface{"org.freedesktop.DBus"}
+        field_interface{"org.freedesktop.DBus"}
       },
       {
-        .value = field_member{"Hello"}
+        field_member{"Hello"}
       },
       {
-        .value = field_signature{}
+        field_signature{}
       }
     }
   };
@@ -38,19 +38,19 @@ auto request_name(std::string_view name) -> protocol::header::header {
         .serial = 1,
         .fields = {
           {
-                .value = field_destination{"org.freedesktop.DBus"}
+                field_destination{"org.freedesktop.DBus"}
           },
           {
-                .value = field_path{"/org/freedesktop/DBus"}
+                field_path{"/org/freedesktop/DBus"}
           },
           {
-                .value = field_interface{"org.freedesktop.DBus"}
+                field_interface{"org.freedesktop.DBus"}
           },
           {
-                .value = field_member{"RequestName"}
+                field_member{"RequestName"}
           },
           {
-                .value = field_signature{"s"}
+                field_signature{"s"}
           }
         },
   };

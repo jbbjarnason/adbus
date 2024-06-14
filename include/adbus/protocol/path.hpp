@@ -55,3 +55,14 @@ struct path {
 };
 
 }  // namespace adbus::protocol
+
+namespace glz {
+template <typename T>
+struct meta;
+template <>
+struct meta<adbus::protocol::path> {
+  using T = adbus::protocol::path;
+  static constexpr auto value{ &T::buffer };
+};
+}  // glz
+

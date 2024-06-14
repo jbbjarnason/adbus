@@ -246,7 +246,7 @@ struct to_dbus_binary<T> {
   static constexpr void op(auto&& variant, auto&&... args) noexcept {
     std::visit([&](auto&& value) {
       using V = std::decay_t<decltype(value)>;
-      auto signature{ type::signature(type::signature_v<V>) };
+      constexpr auto signature{ type::signature(type::signature_v<V>) };
       to_dbus_binary<decltype(signature)>::op<Opts>(signature, args...);
       to_dbus_binary<V>::template op<Opts>(value, args...);
     }, variant);
@@ -291,7 +291,7 @@ struct to_dbus_binary<T> {
   template <options Opts>
   static constexpr void op(auto&& value, is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
     using V = decltype(glz::detail::get_member(std::declval<T>(), glz::meta_wrapper_v<T>));
-    to_dbus_binary<V>::template op<Opts>(glz::detail::get_member(value, glz::meta_wrapper_v<T>), ctx, buffer, idx);
+    to_dbus_binary<std::decay_t<V>>::template op<Opts>(glz::detail::get_member(value, glz::meta_wrapper_v<T>), ctx, buffer, idx);
   }
 };
 

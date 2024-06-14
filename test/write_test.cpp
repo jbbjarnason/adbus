@@ -547,30 +547,32 @@ int main() {
       .flags = {},
       .body_length = 0,
       .serial = 1,
-      .fields = {
-          {
-              .value = header::field_path{"/org/freedesktop/DBus"}
-          }
-      }
+      .fields = { { header::field_path{ adbus::protocol::path::make("/org/freedesktop/DBus").value() } } }
     };
     auto err = write_dbus_binary(hello, buffer);
     expect(!err);
-    std::vector<std::uint8_t> compare{
-      'l', // endian
-      1, // message type method call
-      0, // flags none
-      1, // version 1
-      0,0,0,0, // body length
-      1,0,0,0, // serial
-      0,0,0,0, // field array byte length todo
-      1, // field code of PATH
-      1, // signature length
-      'o', // signature
-      0, // null terminator
-      21,0,0,0, // size of string
-      '/','o','r','g','/','f','r','e','e','d','e','s','k','t','o','p','/','D','B','u','s', 0
-    };
+    std::vector<std::uint8_t> compare{ 'l',               // endian
+                                       1,                 // message type method call
+                                       0,                 // flags none
+                                       1,                 // version 1
+                                       0,   0,   0,   0,  // body length
+                                       1,   0,   0,   0,  // serial
+                                       30,  0,   0,   0,  // field array byte length todo
+                                       1,                 // field code of PATH
+                                       1,                 // signature length
+                                       'o',               // signature
+                                       0,                 // null terminator
+                                       21,  0,   0,   0,  // size of string
+                                       '/', 'o', 'r', 'g', '/', 'f', 'r', 'e', 'e', 'd', 'e',
+                                       's', 'k', 't', 'o', 'p', '/', 'D', 'B', 'u', 's', 0 };
     expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
+    for (std::size_t i{}; i < buffer.size(); ++i) {
+      expect(buffer[i] == compare[i]) << fmt::format("Expected: {}, Got: {} at index {}", compare[i],
+                                                     static_cast<std::uint8_t>(buffer[i]), i);
+      if (buffer[i] != compare[i]) {
+        return;
+      }
+    }
     expect(std::equal(buffer.begin(), buffer.end(), compare.begin(), compare.end(), uint8_cmp));
   };
 

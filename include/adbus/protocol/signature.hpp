@@ -186,13 +186,13 @@ struct signature_meta<T> {
   //   glz::tuplet::tuple<std::basic_string_view<char, std::char_traits<char> >, adbus::protocol::type::my_struct my_struct3::*> > >;
   template <typename unused, typename member_pointer, typename... Ts>
   static consteval std::size_t unwrap_inner_tuple_size(glz::tuplet::tuple<unused, member_pointer, Ts...>) noexcept {
-    using member_type = typename glz::member_value<member_pointer>::type;
+    using member_type = decltype(glz::detail::get_member(std::declval<T>(), member_pointer{}));
     assert_signature<std::decay_t<member_type>>();
     return signature_v<std::decay_t<member_type>>.size();
   }
   template <std::size_t N, typename unused, typename member_pointer, typename... Ts>
   static consteval void unwrap_inner_tuple(std::array<char, N>& buffer, std::size_t& idx, glz::tuplet::tuple<unused, member_pointer, Ts...>) noexcept {
-    using member_type = typename glz::member_value<member_pointer>::type;
+    using member_type = decltype(glz::detail::get_member(std::declval<T>(), member_pointer{}));
     assert_signature<std::decay_t<member_type>>();
     constexpr std::string_view signature{ signature_v<std::decay_t<member_type>> };
     std::copy(std::begin(signature), std::end(signature), std::begin(buffer) + idx);
