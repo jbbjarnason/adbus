@@ -220,6 +220,13 @@ struct signature_meta<T> {
       // this is represented as string
       return std::array{ 's', '\0' };
     }
+    else if constexpr (glz::detail::glaze_value_t<T>) {
+      using V = decltype(glz::detail::get_member(std::declval<T>(), glz::meta_wrapper_v<T>));
+      static constexpr std::string_view value{ signature_v<std::decay_t<V>> };
+      auto buffer = std::array<char, value.size() + 1>{};
+      std::copy(std::begin(value), std::end(value), std::begin(buffer));
+      return buffer;
+    }
     else {
 #if __cpp_static_assert >= 202306L
       using util::join_v;

@@ -224,6 +224,12 @@ struct header {
 
 }  // namespace adbus::protocol
 
+template <std::byte code_v, typename variant_t, auto... required_in>
+struct glz::meta<adbus::protocol::header::header_field<code_v, variant_t, required_in...>> {
+  using T = adbus::protocol::header::header_field<code_v, variant_t, required_in...>;
+  static constexpr auto value{ &T::value };
+};
+
 template <>
 struct glz::meta<adbus::protocol::header::header> {
   using T = adbus::protocol::header::header;

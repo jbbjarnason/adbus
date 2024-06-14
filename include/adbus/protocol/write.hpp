@@ -285,6 +285,16 @@ struct to_dbus_binary<T> {
   }
 };
 
+template <glz::detail::glaze_value_t T>
+struct to_dbus_binary<T> {
+  // mostly copied from glaze binary/write.hpp
+  template <options Opts>
+  static constexpr void op(auto&& value, is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
+    using V = decltype(glz::detail::get_member(std::declval<T>(), glz::meta_wrapper_v<T>));
+    to_dbus_binary<V>::template op<Opts>(glz::detail::get_member(value, glz::meta_wrapper_v<T>), ctx, buffer, idx);
+  }
+};
+
 }  // namespace detail
 
 constexpr auto write_dbus_binary(auto&& value, auto&& buffer) noexcept -> error {
