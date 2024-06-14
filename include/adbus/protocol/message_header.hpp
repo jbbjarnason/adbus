@@ -166,6 +166,7 @@ struct header_field {
   static constexpr std::byte code{ code_v };
   static constexpr std::array<message_type_e, sizeof...(required_in)> required{ required_in... };
   type value{};
+  constexpr auto operator==(const header_field&) const noexcept -> bool = default;
 };
 
 // The object to send a call to, or the object a signal is emitted from. The special path /org/freedesktop/DBus/Local is
@@ -187,7 +188,7 @@ using field_reply_serial = header_field<std::byte{ 5 }, std::uint32_t, message_t
 // The name of the connection this message is intended for. This field is usually only meaningful in combination with the
 // message bus (see the section called “Message Bus Specification”), but other servers may define their own meanings for it.
 // This header field is controlled by the message sender.
-using field_destination = header_field<std::byte{ 6 }, std::string>;
+using field_destination = header_field<std::byte{ 6 }, bus_name>;
 // Unique name of the sending connection. This field is usually only meaningful in combination with the message bus, but
 // other servers may define their own meanings for it. On a message bus, this header field is controlled by the message bus,
 // so it is as reliable and trustworthy as the message bus itself. Otherwise, this header field is controlled by the message
@@ -217,7 +218,7 @@ struct field {
                                  field_unix_fds>;
   const std::byte code;
   variant_t value;
-
+  constexpr auto operator==(const field&) const noexcept -> bool = default;
 private:
   template <class T>
   static constexpr auto make_code(T&&) -> std::byte {
@@ -255,6 +256,8 @@ struct header {
   // An array of zero or more header fields where the byte is the field code, and the variant is the field value. The message
   // type determines which fields are required.
   std::vector<field> fields{};
+
+  static constexpr auto message_header = true;
   constexpr auto operator==(const header&) const noexcept -> bool = default;
 };
 
@@ -298,3 +301,19 @@ struct glz::meta<adbus::protocol::header::header> {
       "fields",
       &T::fields) };
 };
+//
+// namespace adbus::protocol::detail {
+//
+// template <typename T>
+// struct to_dbus_binary;
+//
+// template <>
+// struct to_dbus_binary<header::header> {
+//   template <options Opts>
+//   static constexpr void op(auto&& value, is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
+//
+//   }
+// };
+//
+// }  // namespace adbus::protocol::detail
+

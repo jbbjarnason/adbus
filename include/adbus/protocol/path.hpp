@@ -51,6 +51,7 @@ struct path {
     }
     return path{ .buffer = std::string{ input } };
   }
+  constexpr auto operator==(path const& other) const -> bool = default;
   std::string buffer{};
 };
 

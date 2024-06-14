@@ -48,6 +48,11 @@ concept container = glz::range<T> && !string_like<T>;
 template <class T>
 concept has_clear = requires(T v) { v.clear(); };
 
+template <typename T>
+concept is_header = requires {
+  { T::message_header } -> std::convertible_to<const bool&>;
+};
+
 namespace type {
 
 // check if type has static constexpr boolean named dbus_signature

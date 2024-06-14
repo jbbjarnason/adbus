@@ -12,19 +12,16 @@ auto hello() -> protocol::header::header {
     .serial = 1,
     .fields = {
       {
-        field_destination{"org.freedesktop.DBus"}
+        field_path{path::make("/org/freedesktop/DBus").value()}
       },
       {
-        field_path{path::make("/org/freedesktop/DBus").value()}
+        field_destination{"org.freedesktop.DBus"}
       },
       {
         field_interface{"org.freedesktop.DBus"}
       },
       {
         field_member{"Hello"}
-      },
-      {
-        field_signature{}
       }
     }
   };

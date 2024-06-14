@@ -46,6 +46,7 @@ struct name {
     return name{ .value = std::string{ input } };
   }
 
+  constexpr auto operator==(name const& other) const -> bool = default;
   std::string value{};
 };
 

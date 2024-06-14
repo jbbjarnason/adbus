@@ -10,9 +10,9 @@
 #include <glaze/util/variant.hpp>
 
 #include <adbus/core/context.hpp>
-#include <adbus/util/concepts.hpp>
-#include <adbus/protocol/signature.hpp>
 #include <adbus/protocol/padding.hpp>
+#include <adbus/protocol/signature.hpp>
+#include <adbus/util/concepts.hpp>
 
 namespace adbus::protocol {
 
@@ -134,7 +134,8 @@ template <typename T>
 struct to_dbus_binary<T> {
   template <options Opts>
   static constexpr void op(auto&& value, auto&&... args) noexcept {
-    to_dbus_binary<std::underlying_type_t<T>>::template op<Opts>(std::to_underlying(value), std::forward<decltype(args)>(args)...);
+    to_dbus_binary<std::underlying_type_t<T>>::template op<Opts>(std::to_underlying(value),
+                                                                 std::forward<decltype(args)>(args)...);
   }
 };
 
@@ -158,7 +159,7 @@ struct to_dbus_binary<string_t> {
 };
 
 template <typename T>
- requires(std::is_enum_v<T> && glz::detail::glaze_enum_t<T>)
+  requires(std::is_enum_v<T> && glz::detail::glaze_enum_t<T>)
 struct to_dbus_binary<T> {
   template <options Opts>
   static constexpr void op(auto&& value, is_context auto&& ctx, auto&&... args) noexcept {
@@ -167,10 +168,9 @@ struct to_dbus_binary<T> {
     static constexpr auto frozen_map = glz::detail::make_enum_to_string_map<T>();
     const auto& member_it = frozen_map.find(static_cast<key_t>(value));
     if (member_it != frozen_map.end()) {
-      const std::string_view str = {member_it->second.data(), member_it->second.size()};
+      const std::string_view str = { member_it->second.data(), member_it->second.size() };
       to_dbus_binary<std::string_view>::op<Opts>(str, ctx, std::forward<decltype(args)>(args)...);
-    }
-    else [[unlikely]] {
+    } else [[unlikely]] {
       ctx.err = error{ .code = error_code::invalid_enum_conversion };
     }
   }
@@ -200,16 +200,19 @@ struct to_dbus_binary<T> {
       // the first single complete type (the "key") must be a basic type rather than a container type
 #if __cpp_static_assert >= 202306L
       using glz::name_v;
-      using util::join_v;
       using util::chars;
-      static_assert(adbus::type::basic<std::decay_t<typename T::key_type>>, join_v<chars<"The key type of the map-like type \"">, name_v<T>, chars<"\" must be a basic type as per dbus spec">>);
+      using util::join_v;
+      static_assert(adbus::type::basic<std::decay_t<typename T::key_type>>,
+                    join_v<chars<"The key type of the map-like type \"">, name_v<T>,
+                           chars<"\" must be a basic type as per dbus spec">>);
 #else
-      static_assert(adbus::type::basic<std::decay_t<typename T::key_type>>, "The key type of the map-like type must be a basic type as per dbus spec");
+      static_assert(adbus::type::basic<std::decay_t<typename T::key_type>>,
+                    "The key type of the map-like type must be a basic type as per dbus spec");
 #endif
     }
 
     std::uint32_t size_placeholder{};
-    pad<decltype(size_placeholder)>(buffer, idx); // let's manually pad here to get the REAL index of the placeholder
+    pad<decltype(size_placeholder)>(buffer, idx);  // let's manually pad here to get the REAL index of the placeholder
     const auto placeholder_idx{ idx };
     dbus_marshall(size_placeholder, ctx, buffer, idx);
     pad<typename std::decay_t<decltype(value)>::value_type>(buffer, idx);  // n does not include the padding after the length
@@ -244,12 +247,14 @@ template <glz::is_variant T>
 struct to_dbus_binary<T> {
   template <options Opts>
   static constexpr void op(auto&& variant, auto&&... args) noexcept {
-    std::visit([&](auto&& value) {
-      using V = std::decay_t<decltype(value)>;
-      constexpr auto signature{ type::signature(type::signature_v<V>) };
-      to_dbus_binary<decltype(signature)>::op<Opts>(signature, args...);
-      to_dbus_binary<V>::template op<Opts>(value, args...);
-    }, variant);
+    std::visit(
+        [&](auto&& value) {
+          using V = std::decay_t<decltype(value)>;
+          constexpr auto signature{ type::signature(type::signature_v<V>) };
+          to_dbus_binary<decltype(signature)>::op<Opts>(signature, args...);
+          to_dbus_binary<V>::template op<Opts>(value, args...);
+        },
+        variant);
   }
 };
 
@@ -282,6 +287,12 @@ struct to_dbus_binary<T> {
         to_dbus_binary<std::decay_t<decltype(member_ref)>>::template op<Opts>(member_ref, ctx, buffer, idx);
       }
     });
+    if constexpr (is_header<T>) {
+      // The length of the header must be a multiple of 8, allowing the body to begin on an 8-byte boundary when storing the
+      // entire message in a single buffer. If the header does not naturally end on an 8-byte boundary up to 7 bytes of
+      // nul-initialized alignment padding must be added.
+      pad<std::uint64_t>(buffer, idx);
+    }
   }
 };
 
@@ -291,7 +302,8 @@ struct to_dbus_binary<T> {
   template <options Opts>
   static constexpr void op(auto&& value, is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
     using V = decltype(glz::detail::get_member(std::declval<T>(), glz::meta_wrapper_v<T>));
-    to_dbus_binary<std::decay_t<V>>::template op<Opts>(glz::detail::get_member(value, glz::meta_wrapper_v<T>), ctx, buffer, idx);
+    to_dbus_binary<std::decay_t<V>>::template op<Opts>(glz::detail::get_member(value, glz::meta_wrapper_v<T>), ctx, buffer,
+                                                       idx);
   }
 };
 
