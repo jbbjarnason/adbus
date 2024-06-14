@@ -89,7 +89,9 @@ public:
         [this, state = state_e::send_auth,
          auth{ fmt::format("{} {} {}{}", auth_command, auth_mechanism, user_id_hex, line_ending) },
          recv_buffer{ std::make_shared<std::array<char, 1024>>() },
-         recv_view{ ""sv }](auto& self, std::error_code err = {}, std::size_t size = 0) mutable -> void {
+         recv_view{ ""sv },
+         begin{ fmt::format("{}{}", begin_command, line_ending) }
+    ](auto& self, std::error_code err = {}, std::size_t size = 0) mutable -> void {
           if (err) {
             return self.complete(err, {});
           }
