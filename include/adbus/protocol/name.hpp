@@ -49,6 +49,11 @@ struct name {
   std::string value{};
 };
 
+template <typename explicit_name_t>
+constexpr auto format_as(name<explicit_name_t> const& n) -> std::string_view {
+  return n.value;
+}
+
 struct interface_name : name<interface_name> {
   // - Interface names are composed of 2 or more elements separated by a period ('.') character. All elements must contain at
   // least one character.
@@ -125,40 +130,45 @@ struct error_name : interface_name {
 };
 
 static_assert(interface_name::validate("org.freedesktop.DBus") == error{});
-static_assert(interface_name::validate("org.freedesktop.DBus.") == error{.code=error_code::trailing_dot, .index=20});
-static_assert(interface_name::validate("org.freedesktop..DBus") == error{.code=error_code::multiple_dots, .index=16});
-static_assert(interface_name::validate("org.freedesktop.DBus-Local") == error{.code=error_code::invalid_character, .index=20});
+static_assert(interface_name::validate("org.freedesktop.DBus.") == error{ .code = error_code::trailing_dot, .index = 20 });
+static_assert(interface_name::validate("org.freedesktop..DBus") == error{ .code = error_code::multiple_dots, .index = 16 });
+static_assert(interface_name::validate("org.freedesktop.DBus-Local") ==
+              error{ .code = error_code::invalid_character, .index = 20 });
 
 static_assert(bus_name::validate("org.freedesktop.DBus") == error{});
-static_assert(bus_name::validate("org.freedesktop.DBus.") == error{.code=error_code::trailing_dot, .index=20});
-static_assert(bus_name::validate("org.freedesktop..DBus") == error{.code=error_code::multiple_dots, .index=16});
-static_assert(bus_name::validate("org.freedesktop.DBus-Local") == error{.code=error_code::invalid_character, .index=20});
+static_assert(bus_name::validate("org.freedesktop.DBus.") == error{ .code = error_code::trailing_dot, .index = 20 });
+static_assert(bus_name::validate("org.freedesktop..DBus") == error{ .code = error_code::multiple_dots, .index = 16 });
+static_assert(bus_name::validate("org.freedesktop.DBus-Local") ==
+              error{ .code = error_code::invalid_character, .index = 20 });
 
 static_assert(error_name::validate("org.freedesktop.DBus") == error{});
-static_assert(error_name::validate("org.freedesktop.DBus.") == error{.code=error_code::trailing_dot, .index=20});
-static_assert(error_name::validate("org.freedesktop..DBus") == error{.code=error_code::multiple_dots, .index=16});
-static_assert(error_name::validate("org.freedesktop.DBus-Local") == error{.code=error_code::invalid_character, .index=20});
+static_assert(error_name::validate("org.freedesktop.DBus.") == error{ .code = error_code::trailing_dot, .index = 20 });
+static_assert(error_name::validate("org.freedesktop..DBus") == error{ .code = error_code::multiple_dots, .index = 16 });
+static_assert(error_name::validate("org.freedesktop.DBus-Local") ==
+              error{ .code = error_code::invalid_character, .index = 20 });
 
 static_assert(member_name::validate("orgfreedesktopDBus") == error{});
-static_assert(member_name::validate("org.freedesktop.DBus") == error{.code=error_code::invalid_character, .index=3});
-static_assert(member_name::validate("org-freedesktop..DBus") == error{.code=error_code::invalid_character, .index=3});
+static_assert(member_name::validate("org.freedesktop.DBus") == error{ .code = error_code::invalid_character, .index = 3 });
+static_assert(member_name::validate("org-freedesktop..DBus") == error{ .code = error_code::invalid_character, .index = 3 });
 
 }  // namespace adbus::protocol
 
-// template<>
-// struct adbus::protocol::meta<adbus::protocol::interface_name> {
-//   static constexpr std::string_view name{ "adbus::protocol::interface_name" };
-//   static constexpr auto value{ &adbus::protocol::interface_name::value };
-// };
-//
-// template<>
-// struct adbus::protocol::meta<adbus::protocol::bus_name> {
-//   static constexpr std::string_view name{ "adbus::protocol::bus_name" };
-//   static constexpr auto value{ &adbus::protocol::bus_name::value };
-// };
-//
-// template<>
-// struct adbus::protocol::meta<adbus::protocol::member_name> {
-//   static constexpr std::string_view name{ "adbus::protocol::member_name" };
-//   static constexpr auto value{ &adbus::protocol::member_name::value };
-// };
+namespace glz {
+template <typename T>
+struct meta;
+}  // namespace glz
+
+template <>
+struct glz::meta<adbus::protocol::interface_name> {
+  static constexpr auto value{ &adbus::protocol::interface_name::value };
+};
+
+template <>
+struct glz::meta<adbus::protocol::bus_name> {
+  static constexpr auto value{ &adbus::protocol::bus_name::value };
+};
+
+template <>
+struct glz::meta<adbus::protocol::member_name> {
+  static constexpr auto value{ &adbus::protocol::member_name::value };
+};

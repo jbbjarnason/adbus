@@ -9,6 +9,7 @@
 #include <set>
 #include <unordered_set>
 
+#include <adbus/protocol/message_header.hpp>
 #include <adbus/protocol/read.hpp>
 #include <adbus/protocol/signature.hpp>
 
@@ -388,5 +389,30 @@ int main() {
         0x48, 0xe1, 0x7a, 0x14, 0xae, 0xe5, 0x94, 0x40  // double value (6.28 in little-endian format)
       },
     },
+  };
+  namespace header = adbus::protocol::header;
+  "header with path"_test = generic_test_case | std::tuple{
+    generic_test{ .expected = header::header{ .type = header::message_type_e::method_call,
+                                              .flags = {},
+                                              .body_length = 0,
+                                              .serial = 1,
+                                              .fields = { { header::field_path{
+                                                  adbus::protocol::path::make("/org/freedesktop/DBus").value() } } } },
+                  .buffer = { 'l',               // endian
+                              1,                 // message type method call
+                              0,                 // flags none
+                              1,                 // version 1
+                              0,   0,   0,   0,  // body length
+                              1,   0,   0,   0,  // serial
+                              30,  0,   0,   0,  // field array byte length todo
+                              1,                 // field code of PATH
+                              1,                 // signature length
+                              'o',               // signature
+                              0,                 // null terminator
+                              21,  0,   0,   0,  // size of string
+                              '/', 'o', 'r', 'g', '/', 'f', 'r', 'e', 'e', 'd', 'e',
+                              's', 'k', 't', 'o', 'p', '/', 'D', 'B', 'u', 's', 0 }
+
+    }
   };
 }

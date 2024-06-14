@@ -54,6 +54,10 @@ struct path {
   std::string buffer{};
 };
 
+constexpr auto format_as(path const& p) -> std::string_view {
+  return p.buffer;
+}
+
 }  // namespace adbus::protocol
 
 namespace glz {
@@ -64,5 +68,4 @@ struct meta<adbus::protocol::path> {
   using T = adbus::protocol::path;
   static constexpr auto value{ &T::buffer };
 };
-}  // glz
-
+}  // namespace glz

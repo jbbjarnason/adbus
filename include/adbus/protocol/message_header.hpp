@@ -5,11 +5,12 @@
 #include <variant>
 #include <vector>
 
+#include <fmt/format.h>
 #include <glaze/core/common.hpp>
 
-#include <adbus/protocol/signature.hpp>
 #include <adbus/protocol/name.hpp>
 #include <adbus/protocol/path.hpp>
+#include <adbus/protocol/signature.hpp>
 
 namespace glz {
 template <typename T>
@@ -19,7 +20,6 @@ namespace adbus::protocol::type {
 template <typename T>
 struct signature_meta;
 }  // namespace adbus::protocol::type
-
 
 // from https://gitlab.freedesktop.org/dbus/dbus/-/blob/dbus-1.14/dbus/dbus-marshal-header.h?ref_type=heads
 /**
@@ -80,7 +80,7 @@ static constexpr auto serialize_endian() -> char {
     };
   }
 }
-}
+}  // namespace details
 
 enum struct message_type_e : std::uint8_t {
   invalid = 0,    // This is an invalid type.
@@ -89,17 +89,34 @@ enum struct message_type_e : std::uint8_t {
   error,          // Error reply. If the first argument exists and is a string, it is an error message.
   signal,         // Signal emission.
 };
+
+constexpr auto format_as(message_type_e const& t) noexcept -> std::string_view {
+  switch (t) {
+    case message_type_e::invalid:
+      return "invalid";
+    case message_type_e::method_call:
+      return "method_call";
+    case message_type_e::method_return:
+      return "method_return";
+    case message_type_e::error:
+      return "error";
+    case message_type_e::signal:
+      return "signal";
+    default:
+      return "unknown";
+  }
+}
+
 // enum struct message_field_e : std::uint8_t {
 //   invalid = 0,  // Not a valid field name (error if it appears in a message)
 //   path,         // The object to send a call to, or the object a signal is emitted from.
 //   interface,    // The interface to invoke a method call on, or that a signal is emitted from.
 //   member,       // The member, either the method name or signal name.
 //   error_name,   // The name of the error that occurred, for errors
-//   reply_serial,  // The serial number of the message this message is a reply to. (The serial number is the second UINT32 in the header.)
-//   destination,   // The name of the connection this message is intended for.
-//   sender,        // Unique name of the sending connection.
-//   signature,     // The signature of the message body.
-//   unix_fds,      // The number of Unix file descriptors that accompany the message.
+//   reply_serial,  // The serial number of the message this message is a reply to. (The serial number is the second UINT32
+//   in the header.) destination,   // The name of the connection this message is intended for. sender,        // Unique name
+//   of the sending connection. signature,     // The signature of the message body. unix_fds,      // The number of Unix
+//   file descriptors that accompany the message.
 // };
 
 struct flags_t {
@@ -130,12 +147,18 @@ struct flags_t {
     };
     return static_cast<std::byte>(bits.to_ulong());
   }
+  constexpr auto operator==(const flags_t&) const noexcept -> bool = default;
 };
 static_assert(sizeof(flags_t) == 1);
 static_assert(std::is_standard_layout_v<flags_t>);
 static_assert(static_cast<std::byte>(flags_t{ .no_reply_expected = true }) == std::byte{ 0x1 });
 static_assert(static_cast<std::byte>(flags_t{ .no_auto_start = true }) == std::byte{ 0x2 });
 static_assert(static_cast<std::byte>(flags_t{ .allow_interactive_authorization = true }) == std::byte{ 0x4 });
+
+constexpr auto format_as(flags_t const& f) noexcept -> std::string {
+  return fmt::format("no_reply_expected: {}, no_auto_start: {}, allow_interactive_author: {}", f.no_reply_expected,
+                     f.no_auto_start, f.allow_interactive_authorization);
+}
 
 template <std::byte code_v, typename variant_t, message_type_e... required_in>
 struct header_field {
@@ -181,10 +204,20 @@ using field_signature = header_field<std::byte{ 8 }, std::string>;
 using field_unix_fds = header_field<std::byte{ 9 }, std::uint32_t>;
 
 struct field {
-  field(auto&& one_of_variant_t) : code{ make_code(one_of_variant_t) }, value{ std::forward<decltype(one_of_variant_t)>(one_of_variant_t) } {}
-  using variant_t = std::variant<field_path, field_interface, field_member, field_error_name, field_reply_serial, field_destination, field_sender, field_signature, field_unix_fds>;
+  field(auto&& one_of_variant_t)
+      : code{ make_code(one_of_variant_t) }, value{ std::forward<decltype(one_of_variant_t)>(one_of_variant_t) } {}
+  using variant_t = std::variant<field_path,
+                                 field_interface,
+                                 field_member,
+                                 field_error_name,
+                                 field_reply_serial,
+                                 field_destination,
+                                 field_sender,
+                                 field_signature,
+                                 field_unix_fds>;
   const std::byte code;
   variant_t value;
+
 private:
   template <class T>
   static constexpr auto make_code(T&&) -> std::byte {
@@ -192,6 +225,9 @@ private:
   }
 };
 
+constexpr auto format_as(field const& f) noexcept -> std::string {
+  return fmt::format("code: {}, value: {}", f.code, std::visit([](auto&& val) { return fmt::format("{}", val); }, f.value));
+}
 
 /*
 The signature of the header is: "yyyyuua(yv)"
@@ -219,9 +255,17 @@ struct header {
   // An array of zero or more header fields where the byte is the field code, and the variant is the field value. The message
   // type determines which fields are required.
   std::vector<field> fields{};
+  constexpr auto operator==(const header&) const noexcept -> bool = default;
 };
 
-}  // namespace adbus::protocol
+constexpr auto format_as(header const& h) noexcept -> std::string {
+  return fmt::format("endian: {}, type: {}, flags: {}, version: {}, body_length: {}, serial: {}, fields: {}", h.endian,
+                     h.type, h.flags, h.version, h.body_length, h.serial, "foo"
+                     // fmt::join(h.fields, ", ")
+  );
+}
+
+}  // namespace adbus::protocol::header
 
 template <std::byte code_v, typename variant_t, auto... required_in>
 struct glz::meta<adbus::protocol::header::header_field<code_v, variant_t, required_in...>> {
@@ -232,24 +276,25 @@ struct glz::meta<adbus::protocol::header::header_field<code_v, variant_t, requir
 template <>
 struct glz::meta<adbus::protocol::header::field> {
   using T = adbus::protocol::header::field;
-  static constexpr auto value{ glz::object(
-    "code", &T::code,
-    "value", &T::value
-  )};
+  static constexpr auto value{ glz::object("code", &T::code, "value", &T::value) };
 };
 
 template <>
 struct glz::meta<adbus::protocol::header::header> {
   using T = adbus::protocol::header::header;
   static constexpr auto value{ glz::object(
-    "endian", &T::endian,
-    "type", &T::type,
-    "flags", [](auto&& self) -> auto& {
-      return *reinterpret_cast<const std::uint8_t*>(&self.flags);
-    },
-    "version", &T::version,
-    "body_length", &T::body_length,
-    "serial", &T::serial,
-    "fields", &T::fields
-  )};
+      "endian",
+      &T::endian,
+      "type",
+      &T::type,
+      "flags",
+      [](auto&& self) -> auto& { return *reinterpret_cast<const std::uint8_t*>(&self.flags); },
+      "version",
+      &T::version,
+      "body_length",
+      &T::body_length,
+      "serial",
+      &T::serial,
+      "fields",
+      &T::fields) };
 };

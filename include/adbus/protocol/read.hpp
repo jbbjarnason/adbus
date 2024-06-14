@@ -1,13 +1,13 @@
 #pragma once
 
-#include <glaze/util/expected.hpp>
-#include <glaze/core/reflection_tuple.hpp>
 #include <glaze/concepts/container_concepts.hpp>
+#include <glaze/core/reflection_tuple.hpp>
+#include <glaze/util/expected.hpp>
 
 #include <adbus/core/context.hpp>
-#include <adbus/util/concepts.hpp>
 #include <adbus/protocol/padding.hpp>
 #include <adbus/protocol/signature.hpp>
+#include <adbus/util/concepts.hpp>
 
 namespace adbus::protocol {
 
@@ -55,9 +55,11 @@ template <typename T>
 struct from_dbus_binary<T> {
   template <options Opts>
   static constexpr void op(auto&& value, auto&&... args) noexcept {
+    // todo remove const_cast
+    auto& non_const_value = const_cast<std::remove_cvref_t<decltype(value)>&>(value);
     using V = std::underlying_type_t<T>;
     // todo reinterpret_cast is not nice, but it provides less code bloat
-    from_dbus_binary<V>::template op<Opts>(reinterpret_cast<V&>(value), std::forward<decltype(args)>(args)...);
+    from_dbus_binary<V>::template op<Opts>(reinterpret_cast<V&>(non_const_value), std::forward<decltype(args)>(args)...);
   }
 };
 
@@ -94,7 +96,7 @@ struct from_dbus_binary<T> {
     } else {
       static_assert(glz::false_v<V>, "unsupported type");
     }
-    std::advance(it, size + 1); // the +1 is for the null terminator
+    std::advance(it, size + 1);  // the +1 is for the null terminator
   }
 };
 
@@ -113,8 +115,8 @@ struct from_dbus_binary<T> {
     }
     using V = std::decay_t<decltype(value)>;
     std::memcpy(value.data(), &*it, size);
-    value.size_ = size;  // todo could we do this differently?
-    std::advance(it, size + 1); // the +1 is for the null terminator
+    value.size_ = size;          // todo could we do this differently?
+    std::advance(it, size + 1);  // the +1 is for the null terminator
   }
 };
 
@@ -147,7 +149,8 @@ struct from_dbus_binary<T> {
     if (ctx.err) [[unlikely]] {
       return;
     }
-    skip_padding<typename std::decay_t<decltype(value)>::value_type>(ctx, begin, it, end);  // n does not include the padding after the length
+    skip_padding<typename std::decay_t<decltype(value)>::value_type>(
+        ctx, begin, it, end);  // n does not include the padding after the length
     if (ctx.err) [[unlikely]] {
       return;
     }
@@ -174,16 +177,13 @@ struct from_dbus_binary<T> {
         // array like, todo support tuple
         if (idx < std::tuple_size_v<V>) {
           value[idx] = std::move(element);
-        }
-        else [[unlikely]] {
+        } else [[unlikely]] {
           ctx.err = error{ error_code::out_of_range };
           return;
         }
-      }
-      else if constexpr (glz::detail::emplaceable<V>) {
+      } else if constexpr (glz::detail::emplaceable<V>) {
         value.emplace(std::move(element));
-      }
-      else {
+      } else {
         static_assert(glz::false_v<V>, "unsupported type");
       }
       idx++;
@@ -204,11 +204,11 @@ struct from_dbus_binary<T> {
       return;
     }
     // I think this is safe in this context, only used currently for maps
-    from_dbus_binary<typename T::first_type>::template op<Opts>(const_cast<std::remove_const_t<typename T::first_type>&>(pair.first), ctx, begin, it, end);
+    from_dbus_binary<typename T::first_type>::template op<Opts>(
+        const_cast<std::remove_const_t<typename T::first_type>&>(pair.first), ctx, begin, it, end);
     from_dbus_binary<typename T::second_type>::template op<Opts>(pair.second, ctx, begin, it, end);
   }
 };
-
 
 template <glz::is_variant T>
 struct from_dbus_binary<T> {
@@ -236,7 +236,7 @@ struct from_dbus_binary<T> {
   }
 };
 
-template <typename  T>
+template <typename T>
   requires(glz::detail::glaze_object_t<T> || glz::detail::reflectable<T>)
 struct from_dbus_binary<T> {
   static constexpr auto N = glz::reflection_count<T>;
@@ -276,7 +276,8 @@ template <typename T, typename Buffer>
   requires std::is_lvalue_reference_v<T>
 [[nodiscard]] constexpr auto read_dbus_binary(T&& value, Buffer&& buffer) noexcept -> error {
   context ctx{};
-  detail::from_dbus_binary<std::decay_t<T>>::template op<{}>(value, ctx, std::begin(buffer), std::begin(buffer), std::end(buffer));
+  detail::from_dbus_binary<std::decay_t<T>>::template op<{}>(value, ctx, std::begin(buffer), std::begin(buffer),
+                                                             std::end(buffer));
   return ctx.err;
 }
 
