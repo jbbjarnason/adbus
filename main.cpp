@@ -29,7 +29,7 @@ public:
     using std::string_literals::operator""s;
     return asio::async_compose<decltype(token), void(std::error_code)>(
         [this, state = state_e::connect, endp = std::forward<decltype(endpoint)>(endpoint), auth_buffer = "\0"s](
-            auto& self, std::error_code err = {}, std::size_t = 0) mutable -> void {
+            auto& self, std::error_code err = {}, std::size_t size = 0) mutable -> void {
           if (err) {
             return self.complete(err);
           }
@@ -40,9 +40,10 @@ public:
             }
             case state_e::auth_nul_byte: {
               state = state_e::complete;
-              return socket_.async_write_some(asio::buffer(auth_buffer), std::move(self));
+              return asio::async_write(socket_, asio::buffer(auth_buffer), std::move(self));
             }
             case state_e::complete: {
+              fmt::println("wrote {} bytes: {}", auth_buffer, size);
               return self.complete(err);
             }
           }
@@ -98,9 +99,10 @@ public:
           switch (state) {
             case state_e::send_auth: {
               state = state_e::recv_ack;
-              return socket_.async_write_some(asio::buffer(auth), std::move(self));
+              return asio::async_write(socket_, asio::buffer(auth), std::move(self));
             }
             case state_e::recv_ack: {
+              fmt::println("wrote \"{}\" bytes: {}", auth, size);
               state = state_e::send_begin;
               return socket_.async_read_some(asio::buffer(*recv_buffer), std::move(self));
             }
@@ -109,11 +111,12 @@ public:
               state = state_e::complete;
               recv_view = { recv_buffer->data(), size };
               if (recv_view.starts_with(ok_command) && recv_view.ends_with(line_ending)) {
-                return socket_.async_write_some(asio::buffer(begin_command), std::move(self));
+                return asio::async_write(socket_, asio::buffer(begin), std::move(self));
               }
               return self.complete(std::make_error_code(std::errc::bad_message), recv_view);
             }
             case state_e::complete: {
+              fmt::println("wrote \"{}\" bytes: {}", begin, size);
               return self.complete(err, recv_view);
             }
           }
@@ -124,22 +127,28 @@ public:
   auto say_hello(asio::completion_token_for<void(std::error_code, std::string_view)> auto&& token) {
     auto buffer = std::make_shared<std::string>();
     auto const header{ protocol::methods::hello() };
-    if (auto err{ protocol::write_dbus_binary(header, *buffer) }; !!err) {
-      fmt::println(stderr, "error: {}\n", err);
-      exit(1);
+    auto serialize_error{ protocol::write_dbus_binary(header, *buffer) };
+    if (!!serialize_error) {
+      fmt::println(stderr, "error: {}\n", serialize_error);
     }
     enum struct state_e : std::uint8_t { send_hello, recv_my_name, complete };
     return asio::async_compose<decltype(token), void(std::error_code, std::string_view)>(
-        [this, buffer{ std::move(buffer) }, state{ state_e::send_hello }, recv_buffer{ std::make_shared<std::array<char, 1024>>() }](auto& self, std::error_code err = {}, std::size_t size = 0) mutable -> void {
+        [this, serialize_error, buffer{ std::move(buffer) }, state{ state_e::send_hello }, recv_buffer{ std::make_shared<std::array<char, 1024>>() }](auto& self, std::error_code err = {}, std::size_t size = 0) mutable -> void {
+          if (serialize_error) {
+            // Todo make error as std::error_code
+            return self.complete(std::make_error_code(std::errc::no_message_available), {});
+          }
           if (err) {
             return self.complete(err, {});
           }
           switch (state) {
             case state_e::send_hello: {
               state = state_e::recv_my_name;
-              return socket_.async_write_some(asio::buffer(*buffer), std::move(self));
+//              static constexpr std::string_view foo{ "l\001\000\001\000\000\000\000\001\000\000\000n\000\000\000\001\001o\000\025\000\000\000/org/freedesktop/DBus\000\000\000\006\001s\000\024\000\000\000org.freedesktop.DBus\000\000\000\000\002\001s\000\024\000\000\000org.freedesktop.DBus\000\000\000\000\003\001s\000\005\000\000\000Hello\000\000" };
+              return asio::async_write(socket_, asio::buffer(*buffer), std::move(self));
             }
             case state_e::recv_my_name: {
+              fmt::println("buffer size: {}, wrote bytes: {}", buffer->size(), size);
               state = state_e::complete;
               return socket_.async_read_some(asio::buffer(*recv_buffer), std::move(self));
             }
@@ -195,39 +204,39 @@ int main() {
   std::array<char, 1024> recv_buffer{};
 
   socket.async_connect(ep, [&](auto&& ec) {
-    fmt::println("Connect, error_code: {}", ec.message());
-    asio::async_write(socket.socket_, asio::buffer(auth_str), [&](std::error_code err, std::size_t size) {
-      fmt::println("Auth write, error_code: {}, size: {}", err.message(), size);
-      socket.socket_.async_receive(asio::buffer(recv_buffer), [&](std::error_code err, std::size_t size) {
-        std::string_view response{ recv_buffer.data(), size };
-        fmt::println("Auth read, error_code: {}, size: {}\nResponse: {}", err.message(), size, response);
-        asio::async_write(socket.socket_, asio::buffer(begin_str), [&](std::error_code err, std::size_t size) {
-          fmt::println("Begin write, error_code: {}, size: {}", err.message(), size);
-          asio::async_write(socket.socket_, asio::buffer(hello_str), [&](std::error_code err, std::size_t size) {
-              fmt::println("Hello write, error_code: {}, size: {}", err.message(), size);
-              socket.socket_.async_receive(asio::buffer(recv_buffer), [&](std::error_code err, std::size_t size) {
-                std::string_view response{ recv_buffer.data(), size };
-                fmt::println("Hello read, error_code: {}, size: {}\nResponse: {}", err.message(), size, response);
-              });
-          });
-        });
-      });
-    });
+//    fmt::println("Connect, error_code: {}", ec.message());
+//    asio::async_write(socket.socket_, asio::buffer(auth_str), [&](std::error_code err, std::size_t size) {
+//      fmt::println("Auth write, error_code: {}, size: {}", err.message(), size);
+//      socket.socket_.async_receive(asio::buffer(recv_buffer), [&](std::error_code err, std::size_t size) {
+//        std::string_view response{ recv_buffer.data(), size };
+//        fmt::println("Auth read, error_code: {}, size: {}\nResponse: {}", err.message(), size, response);
+//        asio::async_write(socket.socket_, asio::buffer(begin_str), [&](std::error_code err, std::size_t size) {
+//          fmt::println("Begin write, error_code: {}, size: {}", err.message(), size);
+//          asio::async_write(socket.socket_, asio::buffer(hello_str), [&](std::error_code err, std::size_t size) {
+//              fmt::println("Hello write, error_code: {}, size: {}", err.message(), size);
+//              socket.socket_.async_receive(asio::buffer(recv_buffer), [&](std::error_code err, std::size_t size) {
+//                std::string_view response{ recv_buffer.data(), size };
+//                fmt::println("Hello read, error_code: {}, size: {}\nResponse: {}", err.message(), size, response);
+//              });
+//          });
+//        });
+//      });
+//    });
 
-    // socket.external_authenticate([&](std::error_code err, std::string_view msg) {
-    //   // todo why does this not work in debug mode not running in debugger?
-    //   fmt::println("auth err {}: msg {}\n", err.message(), msg);
-    //   timer.expires_from_now(1s);
-    //     timer.async_wait([&](auto&& ec) {
-    //     if (ec) {
-    //       fmt::println("timer err: {}\n", ec.message());
-    //       return;
-    //     }
-    //     fmt::println("timer expired\n");
-    //     socket.say_hello(
-    //       [](std::error_code ec, std::string_view id) { fmt::println("say_hello err {}: msg {}\n", ec.message(), id); });
-    //   });
-    // });
+     socket.external_authenticate([&](std::error_code err, std::string_view msg) {
+       // todo why does this not work in debug mode not running in debugger?
+       fmt::println("auth err {}: msg {}\n", err.message(), msg);
+       timer.expires_from_now(1s);
+         timer.async_wait([&](auto&& ec) {
+         if (ec) {
+           fmt::println("timer err: {}\n", ec.message());
+           return;
+         }
+         fmt::println("timer expired\n");
+         socket.say_hello(
+           [](std::error_code ec, std::string_view id) { fmt::println("say_hello err {}: msg {}\n", ec.message(), id); });
+       });
+     });
   });
 
   ctx.run();
