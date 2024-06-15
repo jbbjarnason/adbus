@@ -564,7 +564,9 @@ int main() {
                                        0,                 // null terminator
                                        21,  0,   0,   0,  // size of string
                                        '/', 'o', 'r', 'g', '/', 'f', 'r', 'e', 'e', 'd', 'e',
-                                       's', 'k', 't', 'o', 'p', '/', 'D', 'B', 'u', 's', 0 };
+                                       's', 'k', 't', 'o', 'p', '/', 'D', 'B', 'u', 's', 0,
+                                       0, 0  // data always start at 8 bit alignment, therefore padding is added
+    };
     expect(buffer.size() == compare.size()) << fmt::format("Expected: {}, Got: {}", compare.size(), buffer.size());
     for (std::size_t i{}; i < buffer.size(); ++i) {
       expect(buffer[i] == compare[i]) << fmt::format("Expected: {}, Got: {} at index {}", compare[i],

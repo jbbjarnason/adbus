@@ -45,7 +45,8 @@ struct from_dbus_binary<T> {
       ctx.err = error{ error_code::out_of_range };
       return;
     }
-    std::memcpy(&value, &*it, sizeof(V));
+    // todo remove this casts
+    std::memcpy(reinterpret_cast<void*>(const_cast<V*>(&value)), &*it, sizeof(V));
     std::advance(it, sizeof(V));
   }
 };
@@ -267,8 +268,26 @@ struct from_dbus_binary<T> {
         from_dbus_binary<std::decay_t<decltype(member_ref)>>::template op<Opts>(member_ref, ctx, begin, it, end);
       }
     });
+    if constexpr (is_header<T>) {
+      // todo test
+      // The length of the header must be a multiple of 8, allowing the body to begin on an 8-byte boundary when storing the
+      // entire message in a single buffer. If the header does not naturally end on an 8-byte boundary up to 7 bytes of
+      // nul-initialized alignment padding must be added.
+      skip_padding<std::uint64_t>(ctx, begin, it, end);
+    }
   }
 };
+
+
+template <glz::detail::glaze_value_t T>
+struct from_dbus_binary<T> {
+  template <options Opts>
+  static constexpr void op(auto&& value, is_context auto&& ctx, auto&& begin, auto&& it, auto&& end) noexcept {
+    using V = decltype(glz::detail::get_member(std::declval<T>(), glz::meta_wrapper_v<T>));
+    from_dbus_binary<std::decay_t<V>>::template op<Opts>(glz::detail::get_member(value, glz::meta_wrapper_v<T>), ctx, begin, it, end);
+  }
+};
+
 
 }  // namespace detail
 
@@ -282,7 +301,7 @@ template <typename T, typename Buffer>
 }
 
 template <typename T, class Buffer>
-[[nodiscard]] constexpr auto read_binary(Buffer&& buffer) noexcept -> glz::expected<T, error> {
+[[nodiscard]] constexpr auto read_dbus_binary(Buffer&& buffer) noexcept -> glz::expected<T, error> {
   T value{};
   auto err = read_dbus_binary(value, buffer);
   if (err) [[unlikely]] {

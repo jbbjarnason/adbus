@@ -205,6 +205,8 @@ using field_signature = header_field<std::byte{ 8 }, std::string>;
 using field_unix_fds = header_field<std::byte{ 9 }, std::uint32_t>;
 
 struct field {
+  // default constructor is only used for reading binary to this struct
+  field() = default;
   field(auto&& one_of_variant_t)
       : code{ make_code(one_of_variant_t) }, value{ std::forward<decltype(one_of_variant_t)>(one_of_variant_t) } {}
   using variant_t = std::variant<field_path,
@@ -216,7 +218,7 @@ struct field {
                                  field_sender,
                                  field_signature,
                                  field_unix_fds>;
-  const std::byte code;
+  const std::byte code{};
   variant_t value;
   constexpr auto operator==(const field&) const noexcept -> bool = default;
 private:
