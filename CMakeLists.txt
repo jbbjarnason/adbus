@@ -21,6 +21,8 @@ CPMAddPackage(
 find_package(fmt CONFIG REQUIRED)
 find_package(glaze REQUIRED)
 
+#add_link_options( -lasan -lubsan )
+
 add_library(adbus INTERFACE)
 add_library(adbus::adbus ALIAS adbus)
 target_include_directories(adbus INTERFACE ${CMAKE_CURRENT_LIST_DIR}/include)

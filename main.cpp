@@ -88,10 +88,10 @@ public:
     auto const user_id_hex{ ascii_to_hex(std::to_string(user_id)) };
     return asio::async_compose<completion_token_t, void(std::error_code, std::string_view)>(
         [this, state = state_e::send_auth,
-         auth{ fmt::format("{} {} {}{}", auth_command, auth_mechanism, user_id_hex, line_ending) },
+         auth = std::make_shared<std::string>(fmt::format("{} {} {}{}", auth_command, auth_mechanism, user_id_hex, line_ending)),
          recv_buffer{ std::make_shared<std::array<char, 1024>>() },
          recv_view{ ""sv },
-         begin{ fmt::format("{}{}", begin_command, line_ending) }
+         begin = std::make_shared<std::string>(fmt::format("{}{}", begin_command, line_ending))
     ](auto& self, std::error_code err = {}, std::size_t size = 0) mutable -> void {
           if (err) {
             return self.complete(err, {});
@@ -99,10 +99,9 @@ public:
           switch (state) {
             case state_e::send_auth: {
               state = state_e::recv_ack;
-              return asio::async_write(socket_, asio::buffer(auth), std::move(self));
+              return asio::async_write(socket_, asio::buffer(*auth), std::move(self));
             }
             case state_e::recv_ack: {
-              fmt::println("wrote \"{}\" bytes: {}", auth, size);
               state = state_e::send_begin;
               return socket_.async_read_some(asio::buffer(*recv_buffer), std::move(self));
             }
@@ -111,12 +110,11 @@ public:
               state = state_e::complete;
               recv_view = { recv_buffer->data(), size };
               if (recv_view.starts_with(ok_command) && recv_view.ends_with(line_ending)) {
-                return asio::async_write(socket_, asio::buffer(begin), std::move(self));
+                return asio::async_write(socket_, asio::buffer(*begin), std::move(self));
               }
               return self.complete(std::make_error_code(std::errc::bad_message), recv_view);
             }
             case state_e::complete: {
-              fmt::println("wrote \"{}\" bytes: {}", begin, size);
               return self.complete(err, recv_view);
             }
           }
@@ -148,7 +146,6 @@ public:
               return asio::async_write(socket_, asio::buffer(*buffer), std::move(self));
             }
             case state_e::recv_my_name: {
-              fmt::println("buffer size: {}, wrote bytes: {}", buffer->size(), size);
               state = state_e::complete;
               return socket_.async_read_some(asio::buffer(*recv_buffer), std::move(self));
             }
@@ -160,7 +157,7 @@ public:
         token, socket_);
   }
 
-// private:
+ private:
   // todo windows using generic::stream_protocol::socket
   asio::local::stream_protocol::socket socket_;
 };
@@ -192,39 +189,15 @@ int main() {
   std::string path{ getenv(adbus::env::session.data()) };
   path = std::regex_replace(path, std::regex(std::string{ adbus::detail::unix_path_prefix }), "");
 
-  asio::local::stream_protocol::endpoint ep{ path };
+  asio::local::stream_protocol::endpoint ep{ "/tmp/relay.sock" };
 
   fmt::println("Connecting to {}\n", ep.path());
 
   asio::steady_timer timer{ ctx, 1s };
 
-  auto const auth_str{ "AUTH EXTERNAL 31303030\r\n"s };
-  auto const begin_str{ "BEGIN\r\n"s };
-  auto const hello_str{ "l\001\000\001\000\000\000\000\001\000\000\000n\000\000\000\001\001o\000\025\000\000\000/org/freedesktop/DBus\000\000\000\006\001s\000\024\000\000\000org.freedesktop.DBus\000\000\000\000\002\001s\000\024\000\000\000org.freedesktop.DBus\000\000\000\000\003\001s\000\005\000\000\000Hello\000\000"s };
-  std::array<char, 1024> recv_buffer{};
-
   socket.async_connect(ep, [&](auto&& ec) {
-//    fmt::println("Connect, error_code: {}", ec.message());
-//    asio::async_write(socket.socket_, asio::buffer(auth_str), [&](std::error_code err, std::size_t size) {
-//      fmt::println("Auth write, error_code: {}, size: {}", err.message(), size);
-//      socket.socket_.async_receive(asio::buffer(recv_buffer), [&](std::error_code err, std::size_t size) {
-//        std::string_view response{ recv_buffer.data(), size };
-//        fmt::println("Auth read, error_code: {}, size: {}\nResponse: {}", err.message(), size, response);
-//        asio::async_write(socket.socket_, asio::buffer(begin_str), [&](std::error_code err, std::size_t size) {
-//          fmt::println("Begin write, error_code: {}, size: {}", err.message(), size);
-//          asio::async_write(socket.socket_, asio::buffer(hello_str), [&](std::error_code err, std::size_t size) {
-//              fmt::println("Hello write, error_code: {}, size: {}", err.message(), size);
-//              socket.socket_.async_receive(asio::buffer(recv_buffer), [&](std::error_code err, std::size_t size) {
-//                std::string_view response{ recv_buffer.data(), size };
-//                fmt::println("Hello read, error_code: {}, size: {}\nResponse: {}", err.message(), size, response);
-//              });
-//          });
-//        });
-//      });
-//    });
-
      socket.external_authenticate([&](std::error_code err, std::string_view msg) {
-       // todo why does this not work in debug mode not running in debugger?
+       // todo why does this not print in debug mode not running in debugger?
        fmt::println("auth err {}: msg {}\n", err.message(), msg);
        timer.expires_from_now(1s);
          timer.async_wait([&](auto&& ec) {
