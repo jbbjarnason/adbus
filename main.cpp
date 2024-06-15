@@ -151,7 +151,7 @@ public:
         token, socket_);
   }
 
-private:
+// private:
   // todo windows using generic::stream_protocol::socket
   asio::local::stream_protocol::socket socket_;
 };
@@ -172,6 +172,7 @@ static constexpr std::string_view unix_path_prefix{ "unix:path=" };
 
 namespace asio = boost::asio;
 using std::string_view_literals::operator""sv;
+using std::string_literals::operator""s;
 using std::chrono_literals::operator""s;
 
 int main() {
@@ -188,28 +189,45 @@ int main() {
 
   asio::steady_timer timer{ ctx, 1s };
 
+  auto const auth_str{ "AUTH EXTERNAL 31303030\r\n"s };
+  auto const begin_str{ "BEGIN\r\n"s };
+  auto const hello_str{ "l\001\000\001\000\000\000\000\001\000\000\000n\000\000\000\001\001o\000\025\000\000\000/org/freedesktop/DBus\000\000\000\006\001s\000\024\000\000\000org.freedesktop.DBus\000\000\000\000\002\001s\000\024\000\000\000org.freedesktop.DBus\000\000\000\000\003\001s\000\005\000\000\000Hello\000\000"s };
+  std::array<char, 1024> recv_buffer{};
 
   socket.async_connect(ep, [&](auto&& ec) {
-    if (ec) {
-      fmt::println("error: {}\n", ec.message());
-      return;
-    }
-    fmt::println("connected\n");
-    socket.external_authenticate([&](std::error_code err, std::string_view msg) {
-      // todo why does this not work in debug mode not running in debugger?
-      fmt::println("auth err {}: msg {}\n", err.message(), msg);
-      timer.expires_from_now(1s);
-        timer.async_wait([&](auto&& ec) {
-        if (ec) {
-          fmt::println("timer err: {}\n", ec.message());
-          return;
-        }
-        fmt::println("timer expired\n");
-        socket.say_hello(
-          [](std::error_code ec, std::string_view id) { fmt::println("say_hello err {}: msg {}\n", ec.message(), id); });
+    fmt::println("Connect, error_code: {}", ec.message());
+    asio::async_write(socket.socket_, asio::buffer(auth_str), [&](std::error_code err, std::size_t size) {
+      fmt::println("Auth write, error_code: {}, size: {}", err.message(), size);
+      socket.socket_.async_receive(asio::buffer(recv_buffer), [&](std::error_code err, std::size_t size) {
+        std::string_view response{ recv_buffer.data(), size };
+        fmt::println("Auth read, error_code: {}, size: {}\nResponse: {}", err.message(), size, response);
+        asio::async_write(socket.socket_, asio::buffer(begin_str), [&](std::error_code err, std::size_t size) {
+          fmt::println("Begin write, error_code: {}, size: {}", err.message(), size);
+          asio::async_write(socket.socket_, asio::buffer(hello_str), [&](std::error_code err, std::size_t size) {
+              fmt::println("Hello write, error_code: {}, size: {}", err.message(), size);
+              socket.socket_.async_receive(asio::buffer(recv_buffer), [&](std::error_code err, std::size_t size) {
+                std::string_view response{ recv_buffer.data(), size };
+                fmt::println("Hello read, error_code: {}, size: {}\nResponse: {}", err.message(), size, response);
+              });
+          });
+        });
       });
-
     });
+
+    // socket.external_authenticate([&](std::error_code err, std::string_view msg) {
+    //   // todo why does this not work in debug mode not running in debugger?
+    //   fmt::println("auth err {}: msg {}\n", err.message(), msg);
+    //   timer.expires_from_now(1s);
+    //     timer.async_wait([&](auto&& ec) {
+    //     if (ec) {
+    //       fmt::println("timer err: {}\n", ec.message());
+    //       return;
+    //     }
+    //     fmt::println("timer expired\n");
+    //     socket.say_hello(
+    //       [](std::error_code ec, std::string_view id) { fmt::println("say_hello err {}: msg {}\n", ec.message(), id); });
+    //   });
+    // });
   });
 
   ctx.run();
