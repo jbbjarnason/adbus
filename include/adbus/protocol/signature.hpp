@@ -23,7 +23,7 @@ using std::string_view_literals::operator""sv;
 
 struct signature {
   constexpr signature() noexcept = default;
-  constexpr explicit signature(std::string_view sv) noexcept {
+  constexpr explicit(false) signature(std::string_view sv) noexcept {
     assert(sv.size() <= 255 && "signature size must be less than 255");
     size_ = sv.size();
     std::copy(std::begin(sv), std::end(sv), std::begin(data_));

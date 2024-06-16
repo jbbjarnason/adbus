@@ -152,9 +152,6 @@ public:
             case state_e::complete: {
               protocol::header::header recv_header{};
               auto deserialize_error{ protocol::read_dbus_binary(recv_header, std::string_view{ recv_buffer->data(), size }) };
-              for (std::size_t i{}; i < size; ++i) {
-                fmt::println("{},", static_cast<std::uint8_t>(recv_buffer->at(i)));
-              }
               return self.complete(err, { recv_buffer->data(), size });
             }
           }
