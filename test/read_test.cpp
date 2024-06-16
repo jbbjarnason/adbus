@@ -435,8 +435,7 @@ int main() {
       // [0]
       6,  // code destination
       1,  // the following signature length
-      's',
-      0,  // signature + null terminator
+      's', 0,  // signature + null terminator
       5, 0, 0, 0,  // string length 5 bytes
       ':', '1', '.', '9', '7', 0,  // string content + null terminator
       0, 0,  // padding
@@ -636,7 +635,8 @@ int main() {
       '7',
       0,
     };
-    auto err = adbus::protocol::read_dbus_binary(header, buffer);
+    // clang-format on
+    auto err = read_dbus_binary(header, buffer);
     expect(!err) << fmt::format("error: {}", err);
   };
 }

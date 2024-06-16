@@ -20,10 +20,10 @@ constexpr void skip_padding(auto&& ctx, auto&& begin, auto&& it, auto&& end) noe
   // alignment - (idx % alignment): This calculates how much padding is needed to reach the next alignment boundary.
   // (alignment - (idx % alignment)) % alignment: This ensures that if idx is already aligned (i.e., idx % alignment == 0),
   // the padding is 0 instead of alignment.
-  const auto position = std::distance(begin, it);
+  const auto position = static_cast<std::size_t>(std::distance(begin, it));
   const auto padding = (alignment - (position % alignment)) % alignment;
   if (it + padding > end) [[unlikely]] {
-    ctx.err = error{ error_code::out_of_range };
+    ctx.err = error{ error_code::out_of_range, static_cast<std::size_t>(std::distance(begin, it)) };
     return;
   }
   std::advance(it, padding);
@@ -42,7 +42,7 @@ struct from_dbus_binary<T> {
       return;
     }
     if (it + sizeof(V) > end) [[unlikely]] {
-      ctx.err = error{ error_code::out_of_range };
+      ctx.err = error{ error_code::out_of_range, static_cast<std::size_t>(std::distance(begin, it)) };
       return;
     }
     // todo remove this casts
@@ -84,7 +84,7 @@ struct from_dbus_binary<T> {
       return;
     }
     if (it + size > end) [[unlikely]] {
-      ctx.err = error{ error_code::out_of_range };
+      ctx.err = error{ error_code::out_of_range, static_cast<std::size_t>(std::distance(begin, it)) };
       return;
     }
     using V = std::decay_t<decltype(value)>;
@@ -111,7 +111,7 @@ struct from_dbus_binary<T> {
       return;
     }
     if (it + size > end) [[unlikely]] {
-      ctx.err = error{ error_code::out_of_range };
+      ctx.err = error{ error_code::out_of_range, static_cast<std::size_t>(std::distance(begin, it)) };
       return;
     }
     using V = std::decay_t<decltype(value)>;
@@ -156,7 +156,7 @@ struct from_dbus_binary<T> {
       return;
     }
     if (it + n > end) [[unlikely]] {
-      ctx.err = error{ error_code::out_of_range };
+      ctx.err = error{ error_code::out_of_range, static_cast<std::size_t>(std::distance(begin, it)) };
       return;
     }
     using V = std::decay_t<decltype(value)>;
@@ -179,7 +179,7 @@ struct from_dbus_binary<T> {
         if (idx < std::tuple_size_v<V>) {
           value[idx] = std::move(element);
         } else [[unlikely]] {
-          ctx.err = error{ error_code::out_of_range };
+          ctx.err = error{ error_code::out_of_range, static_cast<std::size_t>(std::distance(begin, it)) };
           return;
         }
       } else if constexpr (glz::detail::emplaceable<V>) {
@@ -190,7 +190,7 @@ struct from_dbus_binary<T> {
       idx++;
     }
     if (n != 0) [[unlikely]] {
-      ctx.err = error{ error_code::out_of_range };
+      ctx.err = error{ error_code::out_of_range, static_cast<std::size_t>(std::distance(begin, it)) };
     }
   }
 };
@@ -225,7 +225,8 @@ struct from_dbus_binary<T> {
     bool found_it{};
     glz::for_each<N>([&](auto I) {
       using V = std::decay_t<std::variant_alternative_t<I, T>>;
-      if (read_signature == type::signature_v<V>) {
+      // todo how to exit early? probably not possible during run time
+      if (!found_it && read_signature == type::signature_v<V>) {
         variant.template emplace<I>();
         from_dbus_binary<V>::template op<Opts>(std::get<I>(variant), ctx, args...);
         found_it = true;

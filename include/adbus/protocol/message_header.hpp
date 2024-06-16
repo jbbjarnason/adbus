@@ -303,19 +303,4 @@ struct glz::meta<adbus::protocol::header::header> {
       "fields",
       &T::fields) };
 };
-//
-// namespace adbus::protocol::detail {
-//
-// template <typename T>
-// struct to_dbus_binary;
-//
-// template <>
-// struct to_dbus_binary<header::header> {
-//   template <options Opts>
-//   static constexpr void op(auto&& value, is_context auto&& ctx, auto&& buffer, auto&& idx) noexcept {
-//
-//   }
-// };
-//
-// }  // namespace adbus::protocol::detail
 
