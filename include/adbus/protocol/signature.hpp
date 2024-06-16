@@ -110,6 +110,11 @@ struct signature_meta<path> {
   static constexpr auto value{ "o"sv };
 };
 
+template <>
+struct signature_meta<signature> {
+  static constexpr auto value{ "g"sv };
+};
+
 template <typename type_t>
 concept has_signature = requires {
   signature_meta<type_t>::value;

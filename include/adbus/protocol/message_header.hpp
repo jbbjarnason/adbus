@@ -196,7 +196,7 @@ using field_destination = header_field<std::byte{ 6 }, bus_name>;
 using field_sender = header_field<std::byte{ 7 }, std::string>;
 // The signature of the message body. If omitted, it is assumed to be the empty signature "" (i.e. the body must be
 // 0-length). This header field is controlled by the message sender.
-using field_signature = header_field<std::byte{ 8 }, std::string>;
+using field_signature = header_field<std::byte{ 8 }, type::signature>;
 // The number of Unix file descriptors that accompany the message. If omitted, it is assumed that no Unix file descriptors
 // accompany the message. The actual file descriptors need to be transferred via platform specific mechanism out-of-band.
 // They must be sent at the same time as part of the message itself. They may not be sent before the first byte of the
