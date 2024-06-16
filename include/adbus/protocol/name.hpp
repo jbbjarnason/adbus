@@ -43,7 +43,7 @@ struct name {
     if (err) {
       return std::unexpected{ err };
     }
-    return name{ .value = std::string{ input } };
+    return explicit_name_t{ std::string{ input } };
   }
 
   constexpr auto operator==(name const& other) const -> bool = default;

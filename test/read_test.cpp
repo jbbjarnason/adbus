@@ -418,6 +418,32 @@ int main() {
 
     }
   };
+  "header with bus name"_test = generic_test_case | std::tuple{
+    generic_test{ .expected = header::header{ .type = header::message_type_e::method_call,
+                                    .flags = {},
+                                    .body_length = 0,
+                                    .serial = 1,
+                                    .fields = { { header::field_destination {
+                                        adbus::protocol::bus_name::make("org.freedesktop.DBus").value() } } } },
+        .buffer = {
+            'l',               // endian
+            1,                 // message type method call
+            0,                 // flags none
+            1,                 // version 1
+            0,   0,   0,   0,  // body length
+            1,   0,   0,   0,  // serial
+            29,  0,   0,   0,  // field array byte length todo
+            6,                 // field code of DESTINATION
+            1,                 // signature length
+            'o',               // signature
+            0,                 // null terminator
+            20,  0,   0,   0,  // size of string
+            'o', 'r', 'g', '.', 'f', 'r', 'e', 'e', 'd', 'e',
+            's', 'k', 't', 'o', 'p', '.', 'D', 'B', 'u', 's', 0,
+            0, 0, 0  // data always start at 8 bit alignment, therefore padding is added
+        }
+    }
+  };
 
 
   // todo test the following payload

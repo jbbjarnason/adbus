@@ -11,15 +11,12 @@
 #include <adbus/protocol/name.hpp>
 #include <adbus/protocol/path.hpp>
 #include <adbus/protocol/signature.hpp>
+#include <adbus/protocol/read.hpp>
 
 namespace glz {
 template <typename T>
 struct meta;
 }  // namespace glz
-namespace adbus::protocol::type {
-template <typename T>
-struct signature_meta;
-}  // namespace adbus::protocol::type
 
 // from https://gitlab.freedesktop.org/dbus/dbus/-/blob/dbus-1.14/dbus/dbus-marshal-header.h?ref_type=heads
 /**
@@ -304,3 +301,72 @@ struct glz::meta<adbus::protocol::header::header> {
       &T::fields) };
 };
 
+namespace adbus::protocol::detail {
+template <typename T>
+struct from_dbus_binary;
+
+template <>
+struct from_dbus_binary<adbus::protocol::header::field> {
+  template <options Opts>
+  static constexpr void op(auto&& value, is_context auto&& ctx, auto&& begin, auto&& it, auto&& end) noexcept {
+    // A struct must start on an 8-byte boundary regardless of the type of the struct fields.
+    adbus::protocol::detail::skip_padding<std::uint64_t>(ctx, begin, it, end);
+    from_dbus_binary<decltype(value.code)>::template op<Opts>(value.code, ctx, begin, it, end);
+    if (ctx.err) [[unlikely]] {
+      return;
+    }
+    namespace header = adbus::protocol::header;
+    switch (value.code) {
+      case header::field_path::code: {
+        value.value.template emplace<header::field_path>();
+        from_dbus_binary<decltype(header::field_path{}.value)>::template op<Opts>(std::get<header::field_path>(value.value).value, ctx, begin, it, end);
+        return;
+      }
+      case header::field_interface::code: {
+        value.value.template emplace<header::field_interface>();
+        from_dbus_binary<decltype(header::field_interface{}.value)>::template op<Opts>(std::get<header::field_interface>(value.value).value, ctx, begin, it, end);
+        return;
+      }
+      case header::field_member::code: {
+        value.value.template emplace<header::field_member>();
+        from_dbus_binary<decltype(header::field_member{}.value)>::template op<Opts>(std::get<header::field_member>(value.value).value, ctx, begin, it, end);
+        return;
+      }
+      case header::field_error_name::code: {
+        value.value.template emplace<header::field_error_name>();
+        from_dbus_binary<decltype(header::field_error_name{}.value)>::template op<Opts>(std::get<header::field_error_name>(value.value).value, ctx, begin, it, end);
+        return;
+      }
+      case header::field_reply_serial::code: {
+        value.value.template emplace<header::field_reply_serial>();
+        from_dbus_binary<decltype(header::field_reply_serial{}.value)>::template op<Opts>(std::get<header::field_reply_serial>(value.value).value, ctx, begin, it, end);
+        return;
+      }
+      case header::field_destination::code: {
+        value.value.template emplace<header::field_destination>();
+        from_dbus_binary<decltype(header::field_destination{}.value)>::template op<Opts>(std::get<header::field_destination>(value.value).value, ctx, begin, it, end);
+        return;
+      }
+      case header::field_sender::code: {
+        value.value.template emplace<header::field_sender>();
+        from_dbus_binary<decltype(header::field_sender{}.value)>::template op<Opts>(std::get<header::field_sender>(value.value).value, ctx, begin, it, end);
+        return;
+      }
+      case header::field_signature::code: {
+        value.value.template emplace<header::field_signature>();
+        from_dbus_binary<decltype(header::field_signature{}.value)>::template op<Opts>(std::get<header::field_signature>(value.value).value, ctx, begin, it, end);
+        return;
+      }
+      case header::field_unix_fds::code: {
+        value.value.template emplace<header::field_unix_fds>();
+        from_dbus_binary<decltype(header::field_unix_fds{}.value)>::template op<Opts>(std::get<header::field_unix_fds>(value.value).value, ctx, begin, it, end);
+        return;
+      }
+      default:
+        ctx.err = { .code = error_code::unexpected_variant, .index = static_cast<error::index_t>(std::distance(begin, it)) };
+        return;
+    }
+  }
+};
+
+}  // namespace adbus::protocol::detail
