@@ -192,26 +192,16 @@ int main() {
   std::string path{ getenv(adbus::env::session.data()) };
   path = std::regex_replace(path, std::regex(std::string{ adbus::detail::unix_path_prefix }), "");
 
-  asio::local::stream_protocol::endpoint ep{ "/tmp/relay.sock" };
+  asio::local::stream_protocol::endpoint ep{ path };
 
   fmt::println("Connecting to {}\n", ep.path());
-
-  asio::steady_timer timer{ ctx, 1s };
 
   socket.async_connect(ep, [&](auto&& ec) {
      socket.external_authenticate([&](std::error_code err, std::string_view msg) {
        // todo why does this not print in debug mode not running in debugger?
        fmt::println("auth err {}: msg {}\n", err.message(), msg);
-       timer.expires_from_now(1s);
-         timer.async_wait([&](auto&& ec) {
-         if (ec) {
-           fmt::println("timer err: {}\n", ec.message());
-           return;
-         }
-         fmt::println("timer expired\n");
-         socket.say_hello(
-           [](std::error_code ec, std::string_view id) { fmt::println("say_hello err {}: msg {}\n", ec.message(), id); });
-       });
+        socket.say_hello(
+          [](std::error_code ec, std::string_view id) { fmt::println("say_hello err {}: msg {}\n", ec.message(), id); });
      });
   });
 
