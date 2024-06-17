@@ -48,7 +48,7 @@ auto request_name(std::string_view name) -> protocol::header::header {
                 field_member{"RequestName"}
           },
           {
-                field_signature{"s"sv}
+                field_signature{"su"sv}
           }
         },
   };

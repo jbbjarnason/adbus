@@ -267,6 +267,17 @@ constexpr auto format_as(header const& h) noexcept -> std::string {
   );
 }
 
+struct fixed_header {
+  const std::byte endian{ details::serialize_endian() };
+  message_type_e type{ message_type_e::invalid };
+  flags_t flags{};
+  std::byte version{ 1 };
+  std::uint32_t body_length{ 0 };
+  std::uint32_t serial{ 0 };
+  std::uint32_t fields_array_len{ 0 };
+};
+static_assert(sizeof(fixed_header) == 16);
+
 }  // namespace adbus::protocol::header
 
 template <std::byte code_v, typename variant_t, auto... required_in>
@@ -299,6 +310,26 @@ struct glz::meta<adbus::protocol::header::header> {
       &T::serial,
       "fields",
       &T::fields) };
+};
+
+template <>
+struct glz::meta<adbus::protocol::header::fixed_header> {
+  using T = adbus::protocol::header::fixed_header;
+  static constexpr auto value{ glz::object(
+      "endian",
+      &T::endian,
+      "type",
+      &T::type,
+      "flags",
+      [](auto&& self) -> auto& { return *reinterpret_cast<const std::uint8_t*>(&self.flags); },
+      "version",
+      &T::version,
+      "body_length",
+      &T::body_length,
+      "serial",
+      &T::serial,
+      "fields_array_len",
+      &T::fields_array_len) };
 };
 
 namespace adbus::protocol::detail {

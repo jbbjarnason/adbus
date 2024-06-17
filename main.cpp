@@ -129,9 +129,9 @@ public:
     if (!!serialize_error) {
       fmt::println(stderr, "error: {}\n", serialize_error);
     }
-    enum struct state_e : std::uint8_t { send_hello, recv_my_name, complete };
+    enum struct state_e : std::uint8_t { send_hello, recv_fixed_header, recv_payload, complete };
     return asio::async_compose<decltype(token), void(std::error_code, std::string_view)>(
-        [this, serialize_error, buffer{ std::move(buffer) }, state{ state_e::send_hello }, recv_buffer{ std::make_shared<std::array<char, 1024>>() }](auto& self, std::error_code err = {}, std::size_t size = 0) mutable -> void {
+        [this, serialize_error, buffer{ std::move(buffer) }, state{ state_e::send_hello }, recv_buffer{ std::make_shared<std::string>() }](auto& self, std::error_code err = {}, std::size_t size = 0) mutable -> void {
           if (serialize_error) {
             // Todo make error as std::error_code
             return self.complete(std::make_error_code(std::errc::no_message_available), {});
@@ -141,11 +141,24 @@ public:
           }
           switch (state) {
             case state_e::send_hello: {
-              state = state_e::recv_my_name;
+              state = state_e::recv_payload;
               return asio::async_write(socket_, asio::buffer(*buffer), std::move(self));
             }
-            case state_e::recv_my_name: {
+            case state_e::recv_fixed_header: {
+              state = state_e::recv_payload;
+              recv_buffer->reserve(sizeof(protocol::header::fixed_header));
+              return socket_.async_read_some(asio::buffer(*recv_buffer), std::move(self));
+            }
+            case state_e::recv_payload: {
               state = state_e::complete;
+              protocol::header::fixed_header recv_header{};
+              auto deserialize_error{ protocol::read_dbus_binary(recv_header, *recv_buffer) };
+              if (!!deserialize_error) {
+                fmt::println(stderr, "error: {}\n", deserialize_error);
+                // todo std::error_code convertible
+                return self.complete(std::make_error_code(std::errc::bad_message), {});
+              }
+              recv_buffer->resize(recv_buffer->size() + recv_header.body_length + recv_header.fields_array_len);
               return socket_.async_read_some(asio::buffer(*recv_buffer), std::move(self));
             }
             case state_e::complete: {
