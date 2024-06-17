@@ -27,6 +27,7 @@ enum struct error_code : std::uint8_t {
   out_of_range, // if buffer is smaller than the expected input is
   unexpected_enum, // from string
   unexpected_variant, // Any of the given variant type types do not match the signature from buffer
+  // remember to add to glaze enumerate below
 };
 
 struct error final {
@@ -71,7 +72,8 @@ struct glz::meta<adbus::protocol::error_code> {
   "array_too_long", array_too_long,
   "invalid_enum_conversion", invalid_enum_conversion,
   "out_of_range", out_of_range,
-  "unexpected_enum", unexpected_enum
+  "unexpected_enum", unexpected_enum,
+  "unexpected_variant", unexpected_variant
   ) };
 };
 

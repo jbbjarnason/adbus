@@ -18,6 +18,8 @@
 using namespace boost::ut;
 using std::string_view_literals::operator""sv;
 using std::string_literals::operator""s;
+namespace header = adbus::protocol::header;
+
 
 namespace std {
 template <typename... Args>
@@ -390,7 +392,6 @@ int main() {
       },
     },
   };
-  namespace header = adbus::protocol::header;
   "header with path"_test = generic_test_case | std::tuple{
     generic_test{ .expected = header::header{ .type = header::message_type_e::method_call,
                                               .flags = {},
@@ -435,7 +436,7 @@ int main() {
             29,  0,   0,   0,  // field array byte length todo
             6,                 // field code of DESTINATION
             1,                 // signature length
-            'o',               // signature
+            's',               // signature
             0,                 // null terminator
             20,  0,   0,   0,  // size of string
             'o', 'r', 'g', '.', 'f', 'r', 'e', 'e', 'd', 'e',
@@ -447,7 +448,7 @@ int main() {
 
 
   // todo test the following payload
-  "header and payload"_test = [] {
+  "header and payload, response to hello"_test = [] {
     header::header header;
     // clang-format off
     std::vector<std::uint8_t> buffer{
@@ -662,6 +663,30 @@ int main() {
       0,
     };
     // clang-format on
+    auto err = read_dbus_binary(header, buffer);
+    expect(!err) << fmt::format("error: {}", err);
+  };
+
+  "header and payload different but still response to hello"_test = [] {
+    // clang-format off
+    std::vector<std::uint8_t> buffer{
+      'l', // endian
+      2, // message type return
+      1, // flags no_reply expected
+      1, // version 1
+      10, 0, 0, 0, // body length
+      255, 255, 255, 255, // serial
+      63, 0, 0, 0, // field array byte length
+      5, 1, 'u', 0, 1, 0, 0, 0, // [0]
+      7, 1, 's', 0, 20, 0, 0, 0, 'o', 'r', 'g', '.', 'f', 'r', 'e', 'e', 'd', 'e', 's', 'k', 't', 'o', 'p', '.', 'D', 'B', 'u', 's', 0, 0, 0, 0, // [1]
+      6, 1, 's', 0, 5, 0, 0, 0, ':', '1', '.', '8', '2', 0, 0, 0, // [2]
+      8, 1, 'g', 0, 1, 's', 0, 0, // [3]
+      5, 0, 0, 0, ':', '1', '.', '8', '2', 0, // payload
+      // signal below
+      'l', 4, 1, 1, 10, 0, 0, 0, 255, 255, 255, 255, 143, 0, 0, 0, 7, 1, 's', 0, 20, 0, 0, 0, 'o', 'r', 'g', '.', 'f', 'r', 'e', 'e', 'd', 'e', 's', 'k', 't', 'o', 'p', '.', 'D', 'B', 'u', 's', 0, 0, 0, 0, 6, 1, 's', 0, 5, 0, 0, 0, ':', '1', '.', '8', '2', 0, 0, 0, 1, 1, 'o', 0, 21, 0, 0, 0, '/', 'o', 'r', 'g', '/', 'f', 'r', 'e', 'e', 'd', 'e', 's', 'k', 't', 'o', 'p', '/', 'D', 'B', 'u', 's', 0, 0, 0, 2, 1, 's', 0, 20, 0, 0, 0, 'o', 'r', 'g', '.', 'f', 'r', 'e', 'e', 'd', 'e', 's', 'k', 't', 'o', 'p', '.', 'D', 'B', 'u', 's', 0, 0, 0, 0, 3, 1, 's', 0, 12, 0, 0, 0, 'N', 'a', 'm', 'e', 'A', 'c', 'q', 'u', 'i', 'r', 'e', 'd', 0, 0, 0, 0, 8, 1, 'g', 0, 1, 's', 0, 0, 5, 0, 0, 0, ':', '1', '.', '8', '2', 0,
+    };
+    // clang-format on
+    header::header header;
     auto err = read_dbus_binary(header, buffer);
     expect(!err) << fmt::format("error: {}", err);
   };

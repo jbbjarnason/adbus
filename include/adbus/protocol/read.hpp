@@ -106,7 +106,7 @@ struct from_dbus_binary<T> {
   template <options Opts>
   static constexpr void op(auto&& value, is_context auto&& ctx, auto&& begin, auto&& it, auto&& end) noexcept {
     std::uint8_t size{};
-    from_dbus_binary<std::uint32_t>::template op<Opts>(size, ctx, begin, it, end);
+    from_dbus_binary<decltype(size)>::template op<Opts>(size, ctx, begin, it, end);
     if (ctx.err) [[unlikely]] {
       return;
     }
@@ -114,7 +114,6 @@ struct from_dbus_binary<T> {
       ctx.err = error{ error_code::out_of_range, static_cast<std::size_t>(std::distance(begin, it)) };
       return;
     }
-    using V = std::decay_t<decltype(value)>;
     std::memcpy(value.data(), &*it, size);
     value.size_ = size;          // todo could we do this differently?
     std::advance(it, size + 1);  // the +1 is for the null terminator
@@ -164,14 +163,15 @@ struct from_dbus_binary<T> {
       value.clear();
     }
     std::size_t idx{};
-    while (n > 0) {
+    std::int64_t n_signed{ n };
+    while (n_signed > 0) {
       typename V::value_type element{};
       auto const beginning_of_element = it;
       from_dbus_binary<typename V::value_type>::template op<Opts>(element, ctx, begin, it, end);
       if (ctx.err) [[unlikely]] {
         return;
       }
-      n -= std::distance(beginning_of_element, it);
+      n_signed -= std::distance(beginning_of_element, it);
       if constexpr (glz::detail::emplace_backable<V>) {
         value.emplace_back(std::move(element));
       } else if constexpr (array_like<V>) {
@@ -189,7 +189,7 @@ struct from_dbus_binary<T> {
       }
       idx++;
     }
-    if (n != 0) [[unlikely]] {
+    if (n_signed != 0) [[unlikely]] {
       ctx.err = error{ error_code::out_of_range, static_cast<std::size_t>(std::distance(begin, it)) };
     }
   }
@@ -294,11 +294,19 @@ struct from_dbus_binary<T> {
 
 template <typename T, typename Buffer>
   requires std::is_lvalue_reference_v<T>
-[[nodiscard]] constexpr auto read_dbus_binary(T&& value, Buffer&& buffer) noexcept -> error {
+[[nodiscard]] constexpr auto read_dbus_binary(T&& value, Buffer&& buffer, auto&& it) noexcept -> error {
   context ctx{};
-  detail::from_dbus_binary<std::decay_t<T>>::template op<{}>(value, ctx, std::begin(buffer), std::begin(buffer),
-                                                             std::end(buffer));
+  // todo begin of buffer should be const, cbegin
+  detail::from_dbus_binary<std::decay_t<T>>::template op<{}>(value, ctx, std::begin(buffer), it,
+                                                             std::cend(buffer));
   return ctx.err;
+}
+
+template <typename T, typename Buffer>
+  requires std::is_lvalue_reference_v<T>
+[[nodiscard]] constexpr auto read_dbus_binary(T&& value, Buffer&& buffer) noexcept -> error {
+  auto it{ std::begin(buffer) };
+  return read_dbus_binary(std::forward<T>(value), std::forward<Buffer>(buffer), std::move(it));
 }
 
 template <typename T, class Buffer>

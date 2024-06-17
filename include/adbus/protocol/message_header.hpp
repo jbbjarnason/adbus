@@ -306,60 +306,64 @@ template <typename T>
 struct from_dbus_binary;
 
 template <>
-struct from_dbus_binary<adbus::protocol::header::field> {
+struct from_dbus_binary<header::field> {
   template <options Opts>
   static constexpr void op(auto&& value, is_context auto&& ctx, auto&& begin, auto&& it, auto&& end) noexcept {
     // A struct must start on an 8-byte boundary regardless of the type of the struct fields.
-    adbus::protocol::detail::skip_padding<std::uint64_t>(ctx, begin, it, end);
+    detail::skip_padding<std::uint64_t>(ctx, begin, it, end);
     from_dbus_binary<decltype(value.code)>::template op<Opts>(value.code, ctx, begin, it, end);
     if (ctx.err) [[unlikely]] {
       return;
     }
     namespace header = adbus::protocol::header;
+    auto const extract_variant{ [&]<typename field_type>(field_type&&) {
+      type::signature read_signature{};
+      from_dbus_binary<type::signature>::template op<Opts>(read_signature, ctx, begin, it, end);
+      if (ctx.err) [[unlikely]] {
+        return;
+      }
+      if (read_signature != type::signature_v<field_type>) [[unlikely]] {
+        ctx.err = { .code = error_code::unexpected_variant, .index = static_cast<error::index_t>(std::distance(begin, it)) };
+        return;
+      }
+      value.value.template emplace<field_type>();
+      from_dbus_binary<decltype(field_type{}.value)>::template op<Opts>(std::get<field_type>(value.value).value, ctx, begin, it, end);
+    } };
     switch (value.code) {
       case header::field_path::code: {
-        value.value.template emplace<header::field_path>();
-        from_dbus_binary<decltype(header::field_path{}.value)>::template op<Opts>(std::get<header::field_path>(value.value).value, ctx, begin, it, end);
+        extract_variant(header::field_path{});
         return;
       }
       case header::field_interface::code: {
-        value.value.template emplace<header::field_interface>();
-        from_dbus_binary<decltype(header::field_interface{}.value)>::template op<Opts>(std::get<header::field_interface>(value.value).value, ctx, begin, it, end);
+        extract_variant(header::field_interface{});
         return;
       }
       case header::field_member::code: {
-        value.value.template emplace<header::field_member>();
-        from_dbus_binary<decltype(header::field_member{}.value)>::template op<Opts>(std::get<header::field_member>(value.value).value, ctx, begin, it, end);
+        extract_variant(header::field_member{});
         return;
       }
       case header::field_error_name::code: {
-        value.value.template emplace<header::field_error_name>();
-        from_dbus_binary<decltype(header::field_error_name{}.value)>::template op<Opts>(std::get<header::field_error_name>(value.value).value, ctx, begin, it, end);
+        extract_variant(header::field_error_name{});
         return;
       }
       case header::field_reply_serial::code: {
-        value.value.template emplace<header::field_reply_serial>();
-        from_dbus_binary<decltype(header::field_reply_serial{}.value)>::template op<Opts>(std::get<header::field_reply_serial>(value.value).value, ctx, begin, it, end);
+        extract_variant(header::field_reply_serial{});
         return;
       }
       case header::field_destination::code: {
-        value.value.template emplace<header::field_destination>();
-        from_dbus_binary<decltype(header::field_destination{}.value)>::template op<Opts>(std::get<header::field_destination>(value.value).value, ctx, begin, it, end);
+        extract_variant(header::field_destination{});
         return;
       }
       case header::field_sender::code: {
-        value.value.template emplace<header::field_sender>();
-        from_dbus_binary<decltype(header::field_sender{}.value)>::template op<Opts>(std::get<header::field_sender>(value.value).value, ctx, begin, it, end);
+        extract_variant(header::field_sender{});
         return;
       }
       case header::field_signature::code: {
-        value.value.template emplace<header::field_signature>();
-        from_dbus_binary<decltype(header::field_signature{}.value)>::template op<Opts>(std::get<header::field_signature>(value.value).value, ctx, begin, it, end);
+        extract_variant(header::field_signature{});
         return;
       }
       case header::field_unix_fds::code: {
-        value.value.template emplace<header::field_unix_fds>();
-        from_dbus_binary<decltype(header::field_unix_fds{}.value)>::template op<Opts>(std::get<header::field_unix_fds>(value.value).value, ctx, begin, it, end);
+        extract_variant(header::field_unix_fds{});
         return;
       }
       default:

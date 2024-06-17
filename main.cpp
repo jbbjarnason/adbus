@@ -142,7 +142,6 @@ public:
           switch (state) {
             case state_e::send_hello: {
               state = state_e::recv_my_name;
-//              static constexpr std::string_view foo{ "l\001\000\001\000\000\000\000\001\000\000\000n\000\000\000\001\001o\000\025\000\000\000/org/freedesktop/DBus\000\000\000\006\001s\000\024\000\000\000org.freedesktop.DBus\000\000\000\000\002\001s\000\024\000\000\000org.freedesktop.DBus\000\000\000\000\003\001s\000\005\000\000\000Hello\000\000" };
               return asio::async_write(socket_, asio::buffer(*buffer), std::move(self));
             }
             case state_e::recv_my_name: {
@@ -151,8 +150,32 @@ public:
             }
             case state_e::complete: {
               protocol::header::header recv_header{};
-              auto deserialize_error{ protocol::read_dbus_binary(recv_header, std::string_view{ recv_buffer->data(), size }) };
-              return self.complete(err, { recv_buffer->data(), size });
+              std::string_view recv_view{ recv_buffer->data(), size };
+              auto it{ std::begin(recv_view) };
+              auto deserialize_error{ protocol::read_dbus_binary(recv_header, recv_view, it) };
+              if (!!deserialize_error) {
+                fmt::println(stderr, "error: {}\n", deserialize_error);
+                for (auto&& c : recv_view) {
+                  std::uint8_t c_uint{ static_cast<std::uint8_t>(c) };
+                  if (c_uint >= 46 && c_uint <= 122) {
+                    fmt::print(stderr, "'{}', ", c);
+                  } else {
+                    fmt::print(stderr, "{}, ", c_uint);
+                  }
+                  fmt::println("");
+                }
+                // todo std::error_code convertible
+                return self.complete(std::make_error_code(std::errc::bad_message), {});
+              }
+              std::string name{};
+              name.reserve(recv_header.body_length);
+              auto string_parse_error{ protocol::read_dbus_binary(name, recv_view, it) };
+              if (!!string_parse_error) {
+                fmt::println(stderr, "error: {}\n", string_parse_error);
+                // todo std::error_code convertible
+                return self.complete(std::make_error_code(std::errc::bad_message), {});
+              }
+              return self.complete(err, name);
             }
           }
         },
