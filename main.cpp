@@ -131,7 +131,15 @@ public:
     }
     enum struct state_e : std::uint8_t { send_hello, recv_fixed_header, recv_header_fields, recv_payload, complete };
     return asio::async_compose<decltype(token), void(std::error_code, std::string_view)>(
-        [this, serialize_error, buffer{ std::move(buffer) }, state{ state_e::send_hello }, recv_buffer{ std::make_shared<std::string>() }](auto& self, std::error_code err = {}, std::size_t size = 0) mutable -> void {
+        [this,
+         serialize_error,
+         buffer{ std::move(buffer) },
+         state{ state_e::send_hello },
+         buffer_fixed_header{ std::make_shared<std::string>() },
+         buffer_header_fields{ std::make_shared<std::string>() },
+         buffer_payload{ std::make_shared<std::string>() },
+         recv_header{ protocol::header::header{} }
+    ](auto& self, std::error_code err = {}, std::size_t size = 0) mutable -> void {
           if (serialize_error) {
             // Todo make error as std::error_code
             return self.complete(std::make_error_code(std::errc::no_message_available), {});
@@ -141,48 +149,43 @@ public:
           }
           switch (state) {
             case state_e::send_hello: {
-              state = state_e::recv_payload;
+              state = state_e::recv_fixed_header;
               return asio::async_write(socket_, asio::buffer(*buffer), std::move(self));
             }
             case state_e::recv_fixed_header: {
-              state = state_e::recv_payload;
-              recv_buffer->reserve(sizeof(protocol::header::fixed_header));
-              return socket_.async_read_some(asio::buffer(*recv_buffer), std::move(self));
+              state = state_e::recv_header_fields;
+              buffer_fixed_header->reserve(sizeof(protocol::header::fixed_header));
+              return socket_.async_read_some(asio::buffer(*buffer_fixed_header), std::move(self));
             }
             case state_e::recv_header_fields: {
-              state = state_e::complete;
-              protocol::header::fixed_header recv_header{};
-              auto deserialize_error{ protocol::read_dbus_binary(recv_header, *recv_buffer) };
+              state = state_e::recv_payload;
+              protocol::header::fixed_header fixed_header{};
+              auto deserialize_error{ protocol::read_dbus_binary(fixed_header, *buffer_fixed_header) };
               if (!!deserialize_error) {
                 fmt::println(stderr, "error: {}\n", deserialize_error);
                 // todo std::error_code convertible
                 return self.complete(std::make_error_code(std::errc::bad_message), {});
               }
-              recv_buffer->resize(recv_buffer->size() + recv_header.fields_array_len);
-              return socket_.async_read_some(asio::buffer(*recv_buffer), std::move(self));
+              buffer_header_fields->reserve(fixed_header.fields_array_len);
+              return socket_.async_read_some(asio::buffer(*buffer_header_fields), std::move(self));
+            }
+            case state_e::recv_payload: {
+              state = state_e::complete;
+              // not the most optimized but shouldn't be too big copy
+              buffer_fixed_header->append(*buffer_header_fields);
+              auto deserialize_error{ protocol::read_dbus_binary(recv_header, *buffer_fixed_header) };
+              if (!!deserialize_error) {
+                fmt::println(stderr, "error: {}\n", deserialize_error);
+                // todo std::error_code convertible
+                return self.complete(std::make_error_code(std::errc::bad_message), {});
+              }
+              buffer_payload->reserve(recv_header.body_length);
+              return socket_.async_read_some(asio::buffer(*buffer_payload), std::move(self));
             }
             case state_e::complete: {
-              protocol::header::header recv_header{};
-              std::string_view recv_view{ recv_buffer->data(), size };
-              auto it{ std::begin(recv_view) };
-              auto deserialize_error{ protocol::read_dbus_binary(recv_header, recv_view, it) };
-              if (!!deserialize_error) {
-                fmt::println(stderr, "error: {}\n", deserialize_error);
-                for (auto&& c : recv_view) {
-                  std::uint8_t c_uint{ static_cast<std::uint8_t>(c) };
-                  if (c_uint >= 46 && c_uint <= 122) {
-                    fmt::print(stderr, "'{}', ", c);
-                  } else {
-                    fmt::print(stderr, "{}, ", c_uint);
-                  }
-                  fmt::println("");
-                }
-                // todo std::error_code convertible
-                return self.complete(std::make_error_code(std::errc::bad_message), {});
-              }
               std::string name{};
               name.reserve(recv_header.body_length);
-              auto string_parse_error{ protocol::read_dbus_binary(name, recv_view, it) };
+              auto string_parse_error{ protocol::read_dbus_binary(name, *buffer_payload) };
               if (!!string_parse_error) {
                 fmt::println(stderr, "error: {}\n", string_parse_error);
                 // todo std::error_code convertible
