@@ -135,7 +135,7 @@ public:
          serialize_error,
          buffer{ std::move(buffer) },
          state{ state_e::send_hello },
-         buffer_fixed_header{ std::make_shared<std::string>() },
+         buffer_header{ std::make_shared<std::string>() },
          buffer_header_fields{ std::make_shared<std::string>() },
          buffer_payload{ std::make_shared<std::string>() },
          recv_header{ protocol::header::header{} }
@@ -154,37 +154,41 @@ public:
             }
             case state_e::recv_fixed_header: {
               state = state_e::recv_header_fields;
-              buffer_fixed_header->reserve(sizeof(protocol::header::fixed_header));
-              return socket_.async_read_some(asio::buffer(*buffer_fixed_header), std::move(self));
+              buffer_header->resize(sizeof(protocol::header::fixed_header));
+              return socket_.async_read_some(asio::buffer(*buffer_header), std::move(self));
             }
             case state_e::recv_header_fields: {
               state = state_e::recv_payload;
               protocol::header::fixed_header fixed_header{};
-              auto deserialize_error{ protocol::read_dbus_binary(fixed_header, *buffer_fixed_header) };
+              auto deserialize_error{ protocol::read_dbus_binary(fixed_header, *buffer_header) };
               if (!!deserialize_error) {
                 fmt::println(stderr, "error: {}\n", deserialize_error);
                 // todo std::error_code convertible
                 return self.complete(std::make_error_code(std::errc::bad_message), {});
               }
-              buffer_header_fields->reserve(fixed_header.fields_array_len);
+              // + padding length
+              const std::size_t total_header_length{ sizeof(protocol::header::fixed_header) + fixed_header.fields_array_len };
+              constexpr auto alignment{ 8 }; // 8 bit alignment after header
+              const auto padding = (alignment - (total_header_length % alignment)) % alignment;
+              buffer_header_fields->resize(fixed_header.fields_array_len + padding);
               return socket_.async_read_some(asio::buffer(*buffer_header_fields), std::move(self));
             }
             case state_e::recv_payload: {
               state = state_e::complete;
               // not the most optimized but shouldn't be too big copy
-              buffer_fixed_header->append(*buffer_header_fields);
-              auto deserialize_error{ protocol::read_dbus_binary(recv_header, *buffer_fixed_header) };
+              buffer_header->append(*buffer_header_fields);
+              auto deserialize_error{ protocol::read_dbus_binary(recv_header, *buffer_header) };
               if (!!deserialize_error) {
                 fmt::println(stderr, "error: {}\n", deserialize_error);
                 // todo std::error_code convertible
                 return self.complete(std::make_error_code(std::errc::bad_message), {});
               }
-              buffer_payload->reserve(recv_header.body_length);
+              buffer_payload->resize(recv_header.body_length);
               return socket_.async_read_some(asio::buffer(*buffer_payload), std::move(self));
             }
             case state_e::complete: {
               std::string name{};
-              name.reserve(recv_header.body_length);
+              name.resize(recv_header.body_length);
               auto string_parse_error{ protocol::read_dbus_binary(name, *buffer_payload) };
               if (!!string_parse_error) {
                 fmt::println(stderr, "error: {}\n", string_parse_error);
