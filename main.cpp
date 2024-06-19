@@ -3,6 +3,7 @@
 
 #include <fmt/format.h>
 #include <boost/asio.hpp>
+#include <glaze/util/expected.hpp>
 
 #include <adbus/protocol/message_header.hpp>
 #include <adbus/protocol/methods.hpp>
@@ -122,35 +123,50 @@ public:
         token, socket_);
   }
 
-  auto say_hello(asio::completion_token_for<void(std::error_code, std::string_view)> auto&& token) {
-    auto buffer = std::make_shared<std::string>();
-    auto const header{ protocol::methods::hello() };
-    auto serialize_error{ protocol::write_dbus_binary(header, *buffer) };
-    if (!!serialize_error) {
-      fmt::println(stderr, "error: {}\n", serialize_error);
+  template <typename return_type>
+  auto call_method(protocol::header::header const& header, auto&& ... params, asio::completion_token_for<void(glz::expected<return_type, std::error_code>)> auto&& token) {
+    static_assert(sizeof...(params) <= 1, "only 0 or 1 parameter supported");
+    using return_t = glz::expected<return_type, std::error_code>;
+    auto write_buffer = std::make_shared<std::vector<std::uint8_t>>();
+    adbus::protocol::error serialize_error{};
+    if constexpr (sizeof...(params) == 0) {
+      serialize_error = protocol::write_dbus_binary(header, *write_buffer);
     }
-    enum struct state_e : std::uint8_t { send_hello, recv_fixed_header, recv_header_fields, recv_payload, complete };
-    return asio::async_compose<decltype(token), void(std::error_code, std::string_view)>(
+    else {
+      auto&& first_param = std::get<0>(std::forward_as_tuple(params...));
+      serialize_error = protocol::write_dbus_binary(first_param, *write_buffer);
+      if (!serialize_error) {
+        std::vector<std::uint8_t> header_buffer{};
+        serialize_error = protocol::write_dbus_binary(header, header_buffer);
+        if (!serialize_error) {
+          // todo benchmark insert vs push_back and rotate or even use std::deque
+          write_buffer->insert(write_buffer->begin(), header_buffer.begin(), header_buffer.end());
+        }
+      }
+    }
+    enum struct state_e : std::uint8_t { send_write, recv_fixed_header, recv_header_fields, recv_payload, complete };
+    return asio::async_compose<decltype(token), void(return_t)>(
         [this,
          serialize_error,
-         buffer{ std::move(buffer) },
-         state{ state_e::send_hello },
+         write_buffer{ std::move(write_buffer) },
+         state{ state_e::send_write },
          buffer_header{ std::make_shared<std::string>() },
          buffer_header_fields{ std::make_shared<std::string>() },
          buffer_payload{ std::make_shared<std::string>() },
          recv_header{ protocol::header::header{} }
     ](auto& self, std::error_code err = {}, std::size_t size = 0) mutable -> void {
           if (serialize_error) {
+            fmt::println(stderr, "error: {}\n", serialize_error);
             // Todo make error as std::error_code
-            return self.complete(std::make_error_code(std::errc::no_message_available), {});
+            return self.complete(glz::unexpected<std::error_code>(std::make_error_code(std::errc::no_message_available)));
           }
           if (err) {
-            return self.complete(err, {});
+            return self.complete(glz::unexpected<std::error_code>(err));
           }
           switch (state) {
-            case state_e::send_hello: {
+            case state_e::send_write: {
               state = state_e::recv_fixed_header;
-              return asio::async_write(socket_, asio::buffer(*buffer), std::move(self));
+              return asio::async_write(socket_, asio::buffer(*write_buffer), std::move(self));
             }
             case state_e::recv_fixed_header: {
               state = state_e::recv_header_fields;
@@ -164,7 +180,7 @@ public:
               if (!!deserialize_error) {
                 fmt::println(stderr, "error: {}\n", deserialize_error);
                 // todo std::error_code convertible
-                return self.complete(std::make_error_code(std::errc::bad_message), {});
+                return self.complete(glz::unexpected<std::error_code>(std::make_error_code(std::errc::bad_message)));
               }
               // + padding length
               const std::size_t total_header_length{ sizeof(protocol::header::fixed_header) + fixed_header.fields_array_len };
@@ -181,26 +197,28 @@ public:
               if (!!deserialize_error) {
                 fmt::println(stderr, "error: {}\n", deserialize_error);
                 // todo std::error_code convertible
-                return self.complete(std::make_error_code(std::errc::bad_message), {});
+                return self.complete(glz::unexpected<std::error_code>(std::make_error_code(std::errc::bad_message)));
               }
               buffer_payload->resize(recv_header.body_length);
               return socket_.async_read_some(asio::buffer(*buffer_payload), std::move(self));
             }
             case state_e::complete: {
-              std::string name{};
-              name.resize(recv_header.body_length);
-              auto string_parse_error{ protocol::read_dbus_binary(name, *buffer_payload) };
-              if (!!string_parse_error) {
-                fmt::println(stderr, "error: {}\n", string_parse_error);
+              return_type return_value{};
+              auto parse_error{ protocol::read_dbus_binary(return_value, *buffer_payload) };
+              if (!!parse_error) {
+                fmt::println(stderr, "error: {}\n", parse_error);
                 // todo std::error_code convertible
-                return self.complete(std::make_error_code(std::errc::bad_message), {});
+                return self.complete(glz::unexpected<std::error_code>(std::make_error_code(std::errc::bad_message)));
               }
-              return self.complete(err, name);
+              return self.complete(std::move(return_value));
             }
           }
         },
         token, socket_);
+  }
 
+  auto say_hello(asio::completion_token_for<void(glz::expected<std::string_view, std::error_code>)> auto&& token) {
+    return call_method<std::string_view>(protocol::methods::hello(), std::forward<decltype(token)>(token));
   }
 
  private:
@@ -244,7 +262,13 @@ int main() {
        // todo why does this not print in debug mode not running in debugger?
        fmt::println("auth err {}: msg {}\n", err.message(), msg);
         socket.say_hello(
-          [](std::error_code ec, std::string_view id) { fmt::println("say_hello err {}: msg {}\n", ec.message(), id); });
+          [](glz::expected<std::string_view, std::error_code> id) {
+              if (id) {
+                fmt::println("say_hello: {}\n", *id);
+              } else {
+                fmt::println("say_hello error: {}\n", id.error().message());
+              }
+           });
      });
   });
 
