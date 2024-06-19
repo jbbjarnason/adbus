@@ -1,5 +1,6 @@
 #include <regex>
 #include <type_traits>
+#include <mutex>
 
 #include <fmt/format.h>
 #include <boost/asio.hpp>
@@ -13,6 +14,29 @@
 
 namespace adbus {
 
+namespace api {
+struct request_name_params {
+  std::string_view name{};
+  struct flags_t {
+    bool allow_replacement : 1 {};
+    bool replace_existing : 1 {};
+    bool do_not_queue : 1 {};
+    std::uint32_t reserved : 29 {};
+  };
+  std::uint32_t flags{};
+  struct glaze {
+    static constexpr auto value{
+      glz::object("name",
+                  &request_name_params::name,
+                  "flags",
+                  [](auto&& self) -> auto& { return *reinterpret_cast<const std::uint32_t*>(&self.flags); }),
+    };
+  };
+};
+enum struct request_name_reply : std::uint32_t { unknown = 0, primary_owner = 1, in_queue = 2, exists = 3, already_owner = 4 };
+}  // namespace api
+
+
 namespace asio = boost::asio;
 
 template <typename Executor = asio::any_io_executor>
@@ -23,6 +47,11 @@ public:
   template <typename executor_in_t>
     requires std::same_as<std::remove_cvref_t<executor_in_t>, Executor>
   explicit basic_dbus_socket(executor_in_t&& executor) : socket_{ std::forward<executor_in_t>(executor) } {}
+
+  std::uint32_t new_serial() {
+    std::scoped_lock lock{ serial_mutex_ };
+    return ++serial_;
+  }
 
   auto async_connect(auto&& endpoint, asio::completion_token_for<void(std::error_code)> auto&& token) {
     // https://dbus.freedesktop.org/doc/dbus-specification.html#auth-nul-byte
@@ -44,7 +73,6 @@ public:
               return asio::async_write(socket_, asio::buffer(auth_buffer), std::move(self));
             }
             case state_e::complete: {
-              fmt::println("wrote {} bytes: {}", auth_buffer, size);
               return self.complete(err);
             }
           }
@@ -124,19 +152,19 @@ public:
   }
 
   template <typename return_type>
-  auto call_method(protocol::header::header const& header, auto&& ... params, asio::completion_token_for<void(glz::expected<return_type, std::error_code>)> auto&& token) {
-    static_assert(sizeof...(params) <= 1, "only 0 or 1 parameter supported");
+  auto call_method(is_header auto&& header, auto&& params, asio::completion_token_for<void(glz::expected<return_type, std::error_code>)> auto&& token) {
     using return_t = glz::expected<return_type, std::error_code>;
     auto write_buffer = std::make_shared<std::vector<std::uint8_t>>();
     adbus::protocol::error serialize_error{};
-    if constexpr (sizeof...(params) == 0) {
+    header.serial = new_serial();
+    if constexpr (std::same_as<glz::skip, std::decay_t<decltype(params)>>) {
       serialize_error = protocol::write_dbus_binary(header, *write_buffer);
     }
     else {
-      auto&& first_param = std::get<0>(std::forward_as_tuple(params...));
-      serialize_error = protocol::write_dbus_binary(first_param, *write_buffer);
+      serialize_error = protocol::write_dbus_binary(params, *write_buffer);
       if (!serialize_error) {
         std::vector<std::uint8_t> header_buffer{};
+        header.body_length = write_buffer->size();
         serialize_error = protocol::write_dbus_binary(header, header_buffer);
         if (!serialize_error) {
           // todo benchmark insert vs push_back and rotate or even use std::deque
@@ -217,13 +245,24 @@ public:
         token, socket_);
   }
 
+  template <typename return_type>
+  auto call_method(is_header auto&& header, asio::completion_token_for<void(glz::expected<return_type, std::error_code>)> auto&& token) {
+    return call_method<return_type>(std::forward<decltype(header)>(header), glz::skip{}, std::forward<decltype(token)>(token));
+  }
+
   auto say_hello(asio::completion_token_for<void(glz::expected<std::string_view, std::error_code>)> auto&& token) {
     return call_method<std::string_view>(protocol::methods::hello(), std::forward<decltype(token)>(token));
+  }
+
+  auto request_name(api::request_name_params const& params, asio::completion_token_for<void(glz::expected<api::request_name_reply, std::error_code>)> auto&& token) {
+    return call_method<api::request_name_reply>(protocol::methods::request_name(), params, std::forward<decltype(token)>(token));
   }
 
  private:
   // todo windows using generic::stream_protocol::socket
   asio::local::stream_protocol::socket socket_;
+  std::uint32_t serial_{};
+  std::mutex serial_mutex_{};
 };
 
 template <typename Executor>
@@ -262,9 +301,17 @@ int main() {
        // todo why does this not print in debug mode not running in debugger?
        fmt::println("auth err {}: msg {}\n", err.message(), msg);
         socket.say_hello(
-          [](glz::expected<std::string_view, std::error_code> id) {
+          [&](glz::expected<std::string_view, std::error_code> id) {
               if (id) {
                 fmt::println("say_hello: {}\n", *id);
+                socket.request_name({.name="com.example.HelloWorld"},
+                  [&](glz::expected<adbus::api::request_name_reply, std::error_code> reply) {
+                    if (reply) {
+                      fmt::println("request_name: {}\n", std::to_underlying(*reply));
+                    } else {
+                      fmt::println("request_name error: {}\n", reply.error().message());
+                    }
+                  });
               } else {
                 fmt::println("say_hello error: {}\n", id.error().message());
               }

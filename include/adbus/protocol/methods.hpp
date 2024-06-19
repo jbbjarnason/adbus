@@ -8,8 +8,6 @@ auto hello() -> protocol::header::header {
   using namespace protocol::header;
   return {
     .type = message_type_e::method_call,
-    .body_length = 0,
-    .serial = 1,
     .fields = {
       {
         field_path{path::make("/org/freedesktop/DBus").value()}
@@ -27,13 +25,11 @@ auto hello() -> protocol::header::header {
   };
 }
 
-auto request_name(std::string_view name) -> protocol::header::header {
+auto request_name() -> protocol::header::header {
   using namespace adbus::protocol::header;
   using std::string_view_literals::operator""sv;
   return {
         .type = message_type_e::method_call,
-        .body_length = 0,
-        .serial = 1,
         .fields = {
           {
                 field_destination{"org.freedesktop.DBus"}
