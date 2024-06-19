@@ -20,13 +20,20 @@ CPMAddPackage(
 
 find_package(fmt CONFIG REQUIRED)
 find_package(glaze REQUIRED)
+find_package(Boost REQUIRED COMPONENTS system)
 
 add_link_options( -lasan -lubsan )
 
 add_library(adbus INTERFACE)
 add_library(adbus::adbus ALIAS adbus)
-target_include_directories(adbus INTERFACE ${CMAKE_CURRENT_LIST_DIR}/include)
-target_link_libraries(adbus INTERFACE fmt::fmt glaze::glaze)
+target_include_directories(adbus
+  INTERFACE
+    ${CMAKE_CURRENT_LIST_DIR}/include
+    ${CMAKE_CURRENT_LIST_DIR}/include/adbus/ext # todo make proper usage of this, like name it with adbus prefix, so conflicts won't arise
+)
+target_link_libraries(adbus INTERFACE fmt::fmt glaze::glaze
+  Boost::system # todo remove, need to make cmake option whether using boost asio or asio
+)
 
 add_executable(adbus_example main.cpp)
 target_link_libraries(adbus_example PRIVATE adbus::adbus)
