@@ -237,7 +237,7 @@ BYTE, BYTE, BYTE, BYTE, UINT32, UINT32, ARRAY of STRUCT of (BYTE,VARIANT)
 
 struct header {
   // Endianness flag; ASCII 'l' for little-endian or ASCII 'B' for big-endian. Both header and body are in this endianness.
-  const std::byte endian{ details::serialize_endian() };
+  std::byte endian{ details::serialize_endian() };
   // Message type. Unknown types must be ignored.
   message_type_e type{ message_type_e::invalid };
   // Bitwise OR of flags_t.
@@ -245,7 +245,7 @@ struct header {
   // Major protocol version of the sending application. If the major protocol version of the receiving application does not
   // match, the applications will not be able to communicate and the D-Bus connection must be disconnected. The major
   // protocol version for this version of the specification is 1.
-  const std::byte version{ 1 };
+  std::byte version{ 1 };
   // Length in bytes of the message body, starting from the end of the header. The header ends after its alignment padding to
   // an 8-boundary.
   std::uint32_t body_length{ 0 };
@@ -255,6 +255,24 @@ struct header {
   // An array of zero or more header fields where the byte is the field code, and the variant is the field value. The message
   // type determines which fields are required.
   std::vector<field> fields{};
+
+  std::optional<std::uint32_t> reply_serial() const noexcept {
+    for (auto&& f : fields) {
+      if (f.code == field_reply_serial::code && std::holds_alternative<field_reply_serial>(f.value)) {
+        return std::get<field_reply_serial>(f.value).value;
+      }
+    }
+    return std::nullopt;
+  }
+
+  std::optional<std::string_view> signature() const noexcept {
+    for (auto&& f : fields) {
+      if (f.code == field_signature::code && std::holds_alternative<field_signature>(f.value)) {
+        return static_cast<std::string_view>(std::get<field_signature>(f.value).value);
+      }
+    }
+    return std::nullopt;
+  }
 
   static constexpr auto message_header = true;
   constexpr auto operator==(const header&) const noexcept -> bool = default;
