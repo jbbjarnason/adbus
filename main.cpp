@@ -60,7 +60,7 @@ namespace detail {
 class incoming_message_queue {
 public:
   incoming_message_queue() = default;
-  auto on_message(is_header auto&& header, std::string&& message) -> std::error_code {
+  [[nodiscard]] auto on_message(is_header auto&& header, std::string&& message) -> std::error_code {
     std::scoped_lock lock{ mutex_ };
     if (message_queue_.empty()) {
       // is this an error? don't think so
@@ -308,7 +308,9 @@ public:
             }
             case state_e::complete: {
               state = state_e::recv_fixed_header;  // loop
-              incoming_message_queue_.on_message(protocol::header::header{ recv_header }, std::move(*buffer_payload));
+              if (auto message_queue_err{ incoming_message_queue_.on_message(protocol::header::header{ recv_header }, std::move(*buffer_payload)) }) {
+                return self.complete(message_queue_err);
+              }
               return asio::post(std::move(self));
             }
           }
@@ -406,7 +408,7 @@ private:
   std::uint32_t serial_{};
   std::mutex serial_mutex_{};
   asio::local::stream_protocol::socket socket_;
-  detail::incoming_message_queue incoming_message_queue_;
+  detail::incoming_message_queue incoming_message_queue_{};
 };
 
 template <typename Executor>
