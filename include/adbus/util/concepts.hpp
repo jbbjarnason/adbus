@@ -53,6 +53,11 @@ concept is_header = requires {
   { T::message_header } -> std::convertible_to<const bool&>;
 };
 
+template <typename T>
+concept has_co_await = requires(T t) {
+  { operator co_await(t) } -> std::convertible_to<std::coroutine_handle<>>;
+};
+
 namespace type {
 
 // check if type has static constexpr boolean named dbus_signature

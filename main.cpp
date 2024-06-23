@@ -70,8 +70,8 @@ public:
       using enum protocol::header::message_type_e;
       case method_return: {
         auto const reply_serial{ header.reply_serial() };
-        auto it =
-            std::ranges::find_if(message_queue_, [reply_serial](auto&& event) { return event->wait_header.serial == reply_serial; });
+        auto it = std::ranges::find_if(message_queue_,
+                                       [reply_serial](auto&& event) { return event->wait_header.serial == reply_serial; });
         if (it == message_queue_.end()) {
           fmt::println(stderr, "error: serial {} not found", reply_serial.value_or(0));
           // todo custom error_code
@@ -308,7 +308,8 @@ public:
             }
             case state_e::complete: {
               state = state_e::recv_fixed_header;  // loop
-              if (auto message_queue_err{ incoming_message_queue_.on_message(protocol::header::header{ recv_header }, std::move(*buffer_payload)) }) {
+              if (auto message_queue_err{ incoming_message_queue_.on_message(protocol::header::header{ recv_header },
+                                                                             std::move(*buffer_payload)) }) {
                 return self.complete(message_queue_err);
               }
               return asio::post(std::move(self));
@@ -403,6 +404,56 @@ public:
                                                 std::forward<decltype(token)>(token));
   }
 
+  template <typename method_param_t, typename method_result_t = void>
+  auto register_method(is_header auto&& header,
+                       std::invocable<method_result_t(glz::expected<method_param_t, std::error_code>)> auto&& token) {
+    enum struct state_e : std::uint8_t { wait_call, call };
+    auto exe{ asio::get_associated_executor(token) };
+    return asio::async_compose<decltype(token), method_result_t(glz::expected<method_param_t, std::error_code>)>(
+        [this, state{ state_e::wait_call }, header_mv{ std::forward<decltype(header)>(header) }](
+            auto& self, std::error_code err = {}, std::size_t size = 0, protocol::header::header const& recv_header = {},
+            std::string_view reply = {}) mutable {
+          if (err) {
+            return self.complete(glz::unexpected<std::error_code>(err));
+          }
+          switch (state) {
+            case state_e::wait_call: {
+              state = state_e::call;
+              return incoming_message_queue_.async_wait(std::move(header_mv), std::move(self));
+            }
+            case state_e::call: {
+              if (recv_header.signature() != protocol::type::signature_v<method_param_t>) {
+                fmt::println(stderr, "error: expected signature {} got {}\n", protocol::type::signature_v<method_param_t>,
+                             recv_header.signature().value_or("unknown"));
+                // todo std::error_code convertible
+                // todo we should async_write error to header
+                return self.complete(glz::unexpected<std::error_code>(std::make_error_code(std::errc::bad_message)));
+              }
+              method_param_t param{};
+              auto parse_error{ protocol::read_dbus_binary(param, reply) };
+              if (!!parse_error) {
+                fmt::println(stderr, "error: {}\n", parse_error);
+                // todo std::error_code convertible
+                return self.complete(glz::unexpected<std::error_code>(std::make_error_code(std::errc::bad_message)));
+              }
+              return self.complete(param);
+            }
+          }
+        }, [executor{ std::move(exe) }, invocable{ token }](glz::expected<method_param_t, std::error_code> const& params) mutable {
+          if constexpr (has_co_await<method_result_t>) {
+            asio::co_spawn(executor, [invocable_mv{ std::move(invocable) }, params_cp{ params }]() -> asio::awaitable<void> {
+              auto result = co_await invocable_mv(params_cp);
+              // todo async write result
+            }, asio::detached);
+          }
+          else {
+            auto result = invocable(params);
+            // todo async write result
+          }
+
+        }, socket_);
+  }
+
 private:
   // todo windows using generic::stream_protocol::socket
   std::uint32_t serial_{};
@@ -413,6 +464,13 @@ private:
 
 template <typename Executor>
 basic_dbus_socket(Executor e) -> basic_dbus_socket<Executor>;
+
+// class dbus_interface {
+// public:
+//   dbus_interface() = default;
+//   dbus_interface(basic_dbus_socket& socket) : socket_{ &socket } {}
+//
+// };
 
 namespace env {
 static constexpr std::string_view session{ "DBUS_SESSION_BUS_ADDRESS" };
