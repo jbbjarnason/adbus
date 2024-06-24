@@ -409,7 +409,7 @@ public:
                        std::invocable<method_result_t(glz::expected<method_param_t, std::error_code>)> auto&& token) {
     enum struct state_e : std::uint8_t { wait_call, call };
     auto exe{ asio::get_associated_executor(token) };
-    return asio::async_compose<decltype(token), method_result_t(glz::expected<method_param_t, std::error_code>)>(
+    return asio::async_compose<decltype(token), method_result_t(protocol::header::header const&, glz::expected<method_param_t, std::error_code>)>(
         [this, state{ state_e::wait_call }, header_mv{ std::forward<decltype(header)>(header) }](
             auto& self, std::error_code err = {}, std::size_t size = 0, protocol::header::header const& recv_header = {},
             std::string_view reply = {}) mutable {
@@ -427,22 +427,38 @@ public:
                              recv_header.signature().value_or("unknown"));
                 // todo std::error_code convertible
                 // todo we should async_write error to header
-                return self.complete(glz::unexpected<std::error_code>(std::make_error_code(std::errc::bad_message)));
+                return self.complete({}, glz::unexpected<std::error_code>(std::make_error_code(std::errc::bad_message)));
               }
               method_param_t param{};
               auto parse_error{ protocol::read_dbus_binary(param, reply) };
               if (!!parse_error) {
                 fmt::println(stderr, "error: {}\n", parse_error);
                 // todo std::error_code convertible
-                return self.complete(glz::unexpected<std::error_code>(std::make_error_code(std::errc::bad_message)));
+                return self.complete({}, glz::unexpected<std::error_code>(std::make_error_code(std::errc::bad_message)));
               }
-              return self.complete(param);
+              return self.complete(recv_header, param);
             }
           }
-        }, [executor{ std::move(exe) }, invocable{ token }](glz::expected<method_param_t, std::error_code> const& params) mutable {
+        }, [executor{ std::move(exe) }, invocable{ token }](protocol::header::header const& recv_header, glz::expected<method_param_t, std::error_code> const& params) mutable {
           if constexpr (has_co_await<method_result_t>) {
-            asio::co_spawn(executor, [invocable_mv{ std::move(invocable) }, params_cp{ params }]() -> asio::awaitable<void> {
+            asio::co_spawn(executor, [this, invocable_mv{ std::move(invocable) }, recv_header_cp{ recv_header }, params_cp{ params }, write_buffer{ std::make_shared<std::string>() }]() -> asio::awaitable<void> {
               auto result = co_await invocable_mv(params_cp);
+              auto err{ protocol::write_dbus_binary(result, *write_buffer) };
+              if (!!err) {
+                fmt::println(stderr, "error: {}\n", err);
+                // todo send write error in header
+                co_return;
+              }
+              protocol::header::header reply_header{
+                .type = protocol::header::message_type_e::method_return,
+                .body_length = write_buffer->size(),
+                .serial = new_serial(),
+                .fields = {
+                  protocol::header::field_reply_serial{ recv_header_cp.serial }
+                  // todo more fields such as destination
+                }
+              };
+
               // todo async write result
             }, asio::detached);
           }
